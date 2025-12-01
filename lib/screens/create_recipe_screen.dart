@@ -179,6 +179,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+                      // УБРАНО .toList()
                       ..._ingredientControllers.asMap().entries.map((entry) {
                         int index = entry.key;
                         TextEditingController controller = entry.value;
@@ -210,7 +211,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ),
@@ -243,6 +244,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+                      // УБРАНО .toList()
                       ..._stepControllers.asMap().entries.map((entry) {
                         int index = entry.key;
                         TextEditingController controller = entry.value;
@@ -303,7 +305,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ),
