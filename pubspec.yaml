@@ -12,6 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_tts: ^3.8.3  # Библеотека для синтеза речи
+  speech_to_text: ^7.2.0
 
 dev_dependencies:
   flutter_test:
