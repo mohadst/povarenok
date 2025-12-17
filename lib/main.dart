@@ -3,13 +3,28 @@ import 'screens/recipes_screen.dart';
 import 'screens/create_recipe_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/login_page.dart';
+import 'screens/register_page.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool isLoggedIn = false;
+
+  void login() {
+    setState(() {
+      isLoggedIn = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,9 +35,42 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      home: const MainNavigationScreen(),
       debugShowCheckedModeBanner: false,
+      home: isLoggedIn
+          ? const MainNavigationScreen()
+          : LoginRegisterWrapper(onLogin: login),
     );
+  }
+}
+
+class LoginRegisterWrapper extends StatefulWidget {
+  final VoidCallback onLogin;
+  const LoginRegisterWrapper({super.key, required this.onLogin});
+
+  @override
+  State<LoginRegisterWrapper> createState() => _LoginRegisterWrapperState();
+}
+
+class _LoginRegisterWrapperState extends State<LoginRegisterWrapper> {
+  bool showLogin = true;
+
+  void toggle() {
+    setState(() {
+      showLogin = !showLogin;
+    });
+  } 
+
+  @override
+  Widget build(BuildContext context) {
+    return showLogin
+        ? LoginPage(
+            onLoginSuccess: widget.onLogin,
+            onRegisterTap: toggle,
+          )
+        : RegisterPage(
+            onRegisterSuccess: widget.onLogin,
+            onLoginTap: toggle,
+          );
   }
 }
 
@@ -53,54 +101,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.restaurant_menu),
+            label: 'Рецепты',
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(25),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Избранное',
           ),
-          child: BottomNavigationBar(
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.restaurant_menu),
-                label: 'Рецепты',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.favorite),
-                label: 'Избранное',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.add_circle_outline),
-                label: 'Создать',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Профиль',
-              ),
-            ],
-            currentIndex: _selectedIndex,
-            selectedItemColor: Colors.orange,
-            unselectedItemColor: Colors.grey,
-            showUnselectedLabels: true,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
-            elevation: 0,
-            onTap: _onItemTapped,
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add_circle_outline),
+            label: 'Создать',
           ),
-        ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Профиль',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.orange,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
       ),
     );
   }

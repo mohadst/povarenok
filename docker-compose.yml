@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: cooking_postgres
+    environment:
+      POSTGRES_DB: cooking_assistant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Node.js сервер (API)
+  api:
+    build:
+      context: ./cooking-api
+      dockerfile: Dockerfile
+    container_name: cooking_api
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cooking_assistant
+      DB_USER: postgres
+      DB_PASSWORD: 12345
+      JWT_SECRET: your_super_secret_key_123456
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./cooking-api:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
