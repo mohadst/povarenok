@@ -8,23 +8,20 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+// === НАСТРОЙКИ CORS ===
+app.use(cors({
+  origin: '*', // Временно разрешаем все для тестов
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 
-// // Разрешить все origins для разработки
-// app.use(cors({
-//   origin: '*', // Временно разрешить все
-//   // Или конкретные origins:
-//   // origin: ['http://localhost:59098', 'http://localhost:3000', 'http://127.0.0.1:*'],
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization'],
-//   credentials: true
-// }));
-
+app.options('*', cors()); // Обработка preflight запросов
 
 // Middleware
-app.use(cors());
 app.use(express.json());
 
-// КОРНЕВОЙ МАРШРУТ (добавьте это!)
+// КОРНЕВОЙ МАРШРУТ
 app.get('/', (req, res) => {
   res.json({
     message: 'Cooking Assistant API работает!',
@@ -47,7 +44,7 @@ const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'cooking_assistant',
-  password: process.env.DB_PASSWORD || 'your_password',
+  password: process.env.DB_PASSWORD || '12345',
   port: process.env.DB_PORT || 5432,
 });
 
@@ -249,7 +246,6 @@ app.post('/api/auth/login', async (req, res) => {
 // ============ RECIPE ENDPOINTS ============
 
 // Получить все рецепты пользователя
-// Получить все рецепты пользователя с фильтрацией по аллергенам
 app.get('/api/recipes', authenticateToken, async (req, res) => {
   try {
     // 1. Получаем предпочтения пользователя
@@ -328,9 +324,7 @@ app.get('/api/recipes', authenticateToken, async (req, res) => {
   }
 });
 
-
 // Создать рецепт
-// Создать рецепт с аллергенами
 app.post('/api/recipes', authenticateToken, async (req, res) => {
   const { title, image_url, ingredients, steps, allergens } = req.body;
 
@@ -421,7 +415,7 @@ app.post('/api/recipes', authenticateToken, async (req, res) => {
   }
 });
 
-// Получить избранные рецепты с полной информацией
+// Получить избранные рецепты
 app.get('/api/favorites', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -543,6 +537,11 @@ app.get('/health', (req, res) => {
 
 // Запуск сервера
 app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 API доступен по адресам:`);
+  console.log(`   - http://localhost:${PORT}`);
+  console.log(`   - http://127.0.0.1:${PORT}`);
+  console.log(`   - http://192.168.121.177:${PORT}`);
+  console.log(`   - http://10.0.2.2:${PORT} (для Android эмулятора)`);
   await initDatabase();
 });
