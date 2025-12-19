@@ -10,14 +10,16 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # UI Components
-  cupertino_icons: ^1.0.2
+  cupertino_icons: ^1.0.2 
   
   # Phone Input
   intl_phone_field: ^3.2.0
   
-  # Text-to-Speech
+  # Text-to-Speech (озвучка)
   flutter_tts: ^3.8.5
+  
+  # Speech-to-Text (распознавание)
+  speech_to_text: ^6.3.0
   
   # HTTP Requests
   http: ^1.1.0

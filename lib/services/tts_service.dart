@@ -1,29 +1,69 @@
-  import 'package:flutter_tts/flutter_tts.dart';
+// lib/services/tts_service.dart
+import 'package:flutter_tts/flutter_tts.dart';
 
-  class TtsService {
-    static final FlutterTts _flutterTts = FlutterTts();
-
-    static Future<void> init() async {
-      // Настраиваем параметры речи
-      await _flutterTts.setLanguage("ru-RU");
-      await _flutterTts.setSpeechRate(0.5); // Скорость речи (0.0 - 1.0)
-      await _flutterTts.setVolume(1.0);     // Громкость (0.0 - 1.0)
-      await _flutterTts.setPitch(1.0);      // Тон (0.5 - 2.0)
-    }
-
-    static Future<void> speak(String text) async {
-      await _flutterTts.speak(text);
-    }
-
-    static Future<void> stop() async {
-      await _flutterTts.stop();
-    }
-
-    static Future<void> pause() async {
-      await _flutterTts.pause();
-    }
-
-    static Future<void> resume() async {
-      await _flutterTts.speak(""); 
-    }
+class TTSService {
+  final FlutterTts _tts = FlutterTts();
+  bool _isSpeaking = false;
+  int _currentStepIndex = 0;
+  List<String> _steps = [];
+  
+  TTSService() {
+    _initTTS();
   }
+  
+  Future<void> _initTTS() async {
+    await _tts.setLanguage('ru-RU');
+    await _tts.setSpeechRate(0.5);
+    await _tts.setVolume(1.0);
+    await _tts.setPitch(1.0);
+  }
+  
+  Future<void> speakSteps(List<String> steps) async {
+    if (_isSpeaking) return;
+    
+    _steps = steps;
+    _currentStepIndex = 0;
+    _isSpeaking = true;
+    
+    await _speakCurrentStep();
+  }
+  
+  Future<void> _speakCurrentStep() async {
+    if (_currentStepIndex >= _steps.length) {
+      _isSpeaking = false;
+      return;
+    }
+    
+    final stepText = 'Шаг ${_currentStepIndex + 1}. ${_steps[_currentStepIndex]}';
+    await _tts.speak(stepText);
+    
+    _tts.setCompletionHandler(() {
+      // Ждем пока пользователь нажмет "Далее"
+    });
+  }
+  
+  Future<void> nextStep() async {
+    if (!_isSpeaking) return;
+    
+    await _tts.stop();
+    _currentStepIndex++;
+    await _speakCurrentStep();
+  }
+  
+  Future<void> previousStep() async {
+    if (!_isSpeaking || _currentStepIndex <= 0) return;
+    
+    await _tts.stop();
+    _currentStepIndex--;
+    await _speakCurrentStep();
+  }
+  
+  Future<void> stop() async {
+    await _tts.stop();
+    _isSpeaking = false;
+  }
+  
+  bool get isSpeaking => _isSpeaking;
+  int get currentStepIndex => _currentStepIndex;
+  int get totalSteps => _steps.length;
+}

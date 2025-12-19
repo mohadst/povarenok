@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'preferences_screen.dart';
+import '../services/api_service.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final VoidCallback onLogout;
+  
+  const ProfileScreen({super.key, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -39,50 +43,11 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Создано рецептов: 0',
+                    'Добро пожаловать!',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[600],
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Статистика
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                childAspectRatio: 1.5,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  _buildStatCard(
-                    icon: Icons.restaurant_menu,
-                    title: 'Рецепты',
-                    value: '3',
-                    color: Colors.blue,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.favorite,
-                    title: 'Избранное',
-                    value: '0',
-                    color: Colors.red,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.access_time,
-                    title: 'Время готовки',
-                    value: '12ч',
-                    color: Colors.green,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.star,
-                    title: 'Рейтинг',
-                    value: '4.5',
-                    color: Colors.amber,
                   ),
                 ],
               ),
@@ -94,10 +59,17 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.settings),
-                    title: const Text('Настройки'),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {},
+                    leading: const Icon(Icons.food_bank, color: Colors.orange),
+                    title: const Text('Настройки питания'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PreferencesScreen(),
+                        ),
+                      );
+                    },
                   ),
                   const Divider(height: 1),
                   ListTile(
@@ -117,41 +89,35 @@ class ProfileScreen extends StatelessWidget {
                       onChanged: (value) {},
                     ),
                   ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.logout, color: Colors.red),
+                    title: const Text('Выйти', style: TextStyle(color: Colors.red)),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Выход'),
+                          content: const Text('Вы уверены, что хотите выйти?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Отмена'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                ApiService.logout();
+                                onLogout();
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Выйти', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.grey,
               ),
             ),
           ],

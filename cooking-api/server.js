@@ -8,6 +8,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+
+// // Разрешить все origins для разработки
+// app.use(cors({
+//   origin: '*', // Временно разрешить все
+//   // Или конкретные origins:
+//   // origin: ['http://localhost:59098', 'http://localhost:3000', 'http://127.0.0.1:*'],
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+//   credentials: true
+// }));
+
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -87,6 +99,12 @@ async function initDatabase() {
         allergies TEXT[],
         dietary_preferences TEXT[],
         forbidden_products TEXT[]
+      );
+
+      CREATE TABLE IF NOT EXISTS recipe_allergens (
+        id SERIAL PRIMARY KEY,
+        recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
+        allergen TEXT NOT NULL
       );
     `);
     console.log('Database initialized successfully');
@@ -231,17 +249,40 @@ app.post('/api/auth/login', async (req, res) => {
 // ============ RECIPE ENDPOINTS ============
 
 // Получить все рецепты пользователя
+// Получить все рецепты пользователя с фильтрацией по аллергенам
 app.get('/api/recipes', authenticateToken, async (req, res) => {
   try {
-    // 1. Получаем рецепты
-    const recipesResult = await pool.query(
-      `SELECT * FROM recipes WHERE user_id = $1 ORDER BY created_at DESC`,
+    // 1. Получаем предпочтения пользователя
+    const preferencesResult = await pool.query(
+      'SELECT allergies FROM user_preferences WHERE user_id = $1',
       [req.user.userId]
     );
 
+    const userAllergies = preferencesResult.rows[0]?.allergies || [];
+
+    // 2. Получаем рецепты с фильтрацией
+    let query = `
+      SELECT DISTINCT r.* 
+      FROM recipes r
+      LEFT JOIN recipe_allergens ra ON r.id = ra.recipe_id
+      WHERE r.user_id = $1
+    `;
+
+    const queryParams = [req.user.userId];
+
+    // Если у пользователя есть аллергии, фильтруем
+    if (userAllergies.length > 0) {
+      query += ` AND (ra.allergen IS NULL OR ra.allergen NOT IN (SELECT unnest($2::text[])))`;
+      queryParams.push(userAllergies);
+    }
+
+    query += ` ORDER BY r.created_at DESC`;
+
+    const recipesResult = await pool.query(query, queryParams);
+
     const recipes = [];
     
-    // 2. Для каждого рецепта получаем ингредиенты и шаги
+    // 3. Для каждого рецепта получаем полную информацию
     for (const recipe of recipesResult.rows) {
       const ingredients = await pool.query(
         'SELECT ingredient FROM recipe_ingredients WHERE recipe_id = $1',
@@ -252,17 +293,31 @@ app.get('/api/recipes', authenticateToken, async (req, res) => {
         'SELECT step_number, instruction FROM recipe_steps WHERE recipe_id = $1 ORDER BY step_number',
         [recipe.id]
       );
+
+      const allergens = await pool.query(
+        'SELECT allergen FROM recipe_allergens WHERE recipe_id = $1',
+        [recipe.id]
+      );
+
+      // Проверяем, в избранном ли рецепт
+      const favorite = await pool.query(
+        'SELECT id FROM favorites WHERE user_id = $1 AND recipe_id = $2',
+        [req.user.userId, recipe.id]
+      );
       
       recipes.push({
         id: recipe.id,
         title: recipe.title,
         image_url: recipe.image_url,
         created_at: recipe.created_at,
+        updated_at: recipe.updated_at,
         ingredients: ingredients.rows.map(r => r.ingredient),
         steps: steps.rows.map(r => ({
           step_number: r.step_number,
           instruction: r.instruction
-        }))
+        })),
+        allergens: allergens.rows.map(r => r.allergen),
+        is_favorite: favorite.rows.length > 0
       });
     }
 
@@ -273,9 +328,11 @@ app.get('/api/recipes', authenticateToken, async (req, res) => {
   }
 });
 
+
 // Создать рецепт
+// Создать рецепт с аллергенами
 app.post('/api/recipes', authenticateToken, async (req, res) => {
-  const { title, image_url, ingredients, steps } = req.body;
+  const { title, image_url, ingredients, steps, allergens } = req.body;
 
   if (!title || !ingredients || !steps) {
     return res.status(400).json({ error: 'Title, ingredients, and steps are required' });
@@ -310,11 +367,50 @@ app.post('/api/recipes', authenticateToken, async (req, res) => {
       );
     }
 
+    // Добавляем аллергены (если указаны)
+    if (allergens && Array.isArray(allergens) && allergens.length > 0) {
+      for (const allergen of allergens) {
+        await client.query(
+          'INSERT INTO recipe_allergens (recipe_id, allergen) VALUES ($1, $2)',
+          [recipe.id, allergen]
+        );
+      }
+    }
+
     await client.query('COMMIT');
+
+    // Получаем полные данные созданного рецепта
+    const recipeIngredients = await pool.query(
+      'SELECT ingredient FROM recipe_ingredients WHERE recipe_id = $1',
+      [recipe.id]
+    );
+    
+    const recipeSteps = await pool.query(
+      'SELECT step_number, instruction FROM recipe_steps WHERE recipe_id = $1 ORDER BY step_number',
+      [recipe.id]
+    );
+
+    const recipeAllergens = await pool.query(
+      'SELECT allergen FROM recipe_allergens WHERE recipe_id = $1',
+      [recipe.id]
+    );
 
     res.status(201).json({
       message: 'Recipe created successfully',
-      recipe: { ...recipe, ingredients, steps }
+      recipe: {
+        id: recipe.id,
+        title: recipe.title,
+        image_url: recipe.image_url,
+        created_at: recipe.created_at,
+        updated_at: recipe.updated_at,
+        ingredients: recipeIngredients.rows.map(r => r.ingredient),
+        steps: recipeSteps.rows.map(r => ({
+          step_number: r.step_number,
+          instruction: r.instruction
+        })),
+        allergens: recipeAllergens.rows.map(r => r.allergen),
+        is_favorite: false
+      }
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -325,25 +421,31 @@ app.post('/api/recipes', authenticateToken, async (req, res) => {
   }
 });
 
-// Получить избранные рецепты
+// Получить избранные рецепты с полной информацией
 app.get('/api/favorites', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT r.*, 
+      `SELECT 
+        r.*,
         ARRAY_AGG(DISTINCT ri.ingredient) as ingredients,
         json_agg(DISTINCT jsonb_build_object('number', rs.step_number, 'instruction', rs.instruction) 
-          ORDER BY rs.step_number) as steps
+          ORDER BY rs.step_number) as steps,
+        ARRAY_AGG(DISTINCT ra.allergen) as allergens
       FROM favorites f
       JOIN recipes r ON f.recipe_id = r.id
       LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id
       LEFT JOIN recipe_steps rs ON r.id = rs.recipe_id
+      LEFT JOIN recipe_allergens ra ON r.id = ra.recipe_id
       WHERE f.user_id = $1
       GROUP BY r.id
       ORDER BY f.created_at DESC`,
       [req.user.userId]
     );
 
-    res.json(result.rows);
+    res.json(result.rows.map(row => ({
+      ...row,
+      is_favorite: true
+    })));
   } catch (error) {
     console.error('Error fetching favorites:', error);
     res.status(500).json({ error: 'Server error fetching favorites' });
