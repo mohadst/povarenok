@@ -19,9 +19,8 @@ dependencies:
   flutter_tts: ^3.8.5
   
   # Speech-to-Text (распознавание)
-  speech_to_text: ^6.3.0
-  
-  # HTTP Requests
+  speech_to_text: ^7.3.0 # Вместо ^6.6.2
+
   http: ^1.1.0
   
   # Local Storage

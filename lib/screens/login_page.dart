@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -22,7 +23,6 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
   bool isLoading = false;
 
-  // ДОБАВЬТЕ ЭТОТ МЕТОД ДЛЯ ТЕСТИРОВАНИЯ
   Future<void> _testLoginAndLoadRecipes() async {
     if (isLoading) return;
     
@@ -31,15 +31,13 @@ class _LoginPageState extends State<LoginPage> {
     try {
       print('🔄 Тестирование входа с +79998882233...');
       
-      // 1. Пробуем войти
       final loginResult = await ApiService.login('+79998882233', 'test123');
       
       if (loginResult['success'] == true) {
         print('✅ Вход успешен!');
         print('   Пользователь: ${loginResult['user']}');
         
-        // 2. Пробуем загрузить рецепты
-        print('🔄 Загрузка рецептов...');
+        print('🔄 Загрузка рецептов...');   
         try {
           final recipes = await ApiService.getRecipes();
           print('✅ Успешно загружено рецептов: ${recipes.length}');
@@ -51,7 +49,6 @@ class _LoginPageState extends State<LoginPage> {
             }
           }
           
-          // Автоматический переход после успеха
           widget.onLoginSuccess();
           
           if (mounted) {
@@ -128,7 +125,6 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result['success']) {
-        // ТЕСТ: попробуем загрузить рецепты после входа
         try {
           final recipes = await ApiService.getRecipes();
           print('✅ После входа загружено рецептов: ${recipes.length}');
@@ -227,8 +223,77 @@ class _LoginPageState extends State<LoginPage> {
                     )
                   : const Text('Войти'),
             ),
-
-            // ДОБАВЬТЕ ЭТУ КНОПКУ ДЛЯ ТЕСТА
+            
+            // КНОПКА ПРОВЕРКИ ПОДКЛЮЧЕНИЯ
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey.withOpacity(0.1),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: [
+                  const Text(
+                    'DEBUG: Проверка сервера',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 4),
+                  ElevatedButton(
+                    onPressed: isLoading ? null : () async {
+                      print('🔄 Тестирую подключение к серверу...');
+                      
+                      final urls = [
+                        'http://localhost:3000/health',
+                        'http://10.0.2.2:3000/health',
+                        'http://127.0.0.1:3000/health',
+                        'http://192.168.121.177:3000/health',
+                      ];
+                      
+                      for (var url in urls) {
+                        try {
+                          print('🔄 Пробую: $url');
+                          final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
+                          print('✅ Успех: ${response.statusCode} - ${response.body}');
+                          
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('✅ Сервер доступен по $url'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                          return;
+                        } catch (e) {
+                          print('❌ $url: $e');
+                        }
+                      }
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('❌ Все адреса недоступны'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueGrey,
+                      minimumSize: const Size(double.infinity, 40),
+                    ),
+                    child: const Text(
+                      '🔧 Проверить подключение (все адреса)',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // КНОПКА ТЕСТА ВХОДА
             const SizedBox(height: 10),
             OutlinedButton(
               onPressed: isLoading ? null : _testLoginAndLoadRecipes,

@@ -3,8 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000/api';
-  
+  static const String baseUrl = 'http://192.168.121.177:3000/api';
   // Для отладки - показывать все запросы
   static bool debugMode = true;
 

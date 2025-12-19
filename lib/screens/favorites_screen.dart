@@ -18,7 +18,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   void initState() {
     super.initState();
-    _initTts();
     _loadFavorites();
   }
 

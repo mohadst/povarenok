@@ -123,7 +123,7 @@ class _LoginRegisterWrapperState extends State<LoginRegisterWrapper> {
 
 class MainNavigationScreen extends StatefulWidget {
   final VoidCallback onLogout;
-  
+
   const MainNavigationScreen({super.key, required this.onLogout});
 
   @override
@@ -133,17 +133,20 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
-  late final List<Widget> _screens;
-
-  @override
-  void initState() {
-    super.initState();
-    _screens = [
-      const RecipesScreen(),
-      const FavoritesScreen(),
-      const CreateRecipeScreen(),
-      ProfileScreen(onLogout: widget.onLogout), // ПЕРЕДАЕМ onLogout
-    ];
+  Widget _buildScreen() {
+    switch (_selectedIndex) {
+      case 0:
+        return const RecipesScreen();
+      case 1:
+        // КЛЮЧЕВОЙ МОМЕНТ
+        return FavoritesScreen(key: UniqueKey());
+      case 2:
+        return const CreateRecipeScreen();
+      case 3:
+        return ProfileScreen(onLogout: widget.onLogout);
+      default:
+        return const RecipesScreen();
+    }
   }
 
   void _onItemTapped(int index) {
@@ -155,8 +158,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: _buildScreen(),
       bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.orange,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.restaurant_menu),
@@ -175,11 +183,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'Профиль',
           ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
       ),
     );
   }

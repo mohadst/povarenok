@@ -7,17 +7,17 @@ class FavoriteButton extends StatefulWidget {
   final double size;
   final Color color;
   final Function(bool)? onChanged;
-  
+
   const FavoriteButton({
-    Key? key,
+    super.key,
     required this.recipeId,
     this.size = 30,
     this.color = Colors.red,
     this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
-  _FavoriteButtonState createState() => _FavoriteButtonState();
+  State<FavoriteButton> createState() => _FavoriteButtonState();
 }
 
 class _FavoriteButtonState extends State<FavoriteButton> {
@@ -32,52 +32,44 @@ class _FavoriteButtonState extends State<FavoriteButton> {
 
   Future<void> _checkFavoriteStatus() async {
     try {
-      setState(() => _isLoading = true);
       final isFav = await ApiService.isFavorite(widget.recipeId);
-      setState(() {
-        _isFavorite = isFav;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Ошибка проверки избранного: $e');
-      setState(() => _isLoading = false);
-    }
+      if (mounted) {
+        setState(() => _isFavorite = isFav);
+      }
+    } catch (_) {}
   }
 
   Future<void> _toggleFavorite() async {
     if (_isLoading) return;
-    
+
     setState(() => _isLoading = true);
-    final bool success;
-    
+
+    bool success;
     if (_isFavorite) {
       success = await ApiService.removeFromFavorites(widget.recipeId);
     } else {
       success = await ApiService.addToFavorites(widget.recipeId);
     }
-    
+
     if (success && mounted) {
       setState(() {
         _isFavorite = !_isFavorite;
         _isLoading = false;
       });
+
+      // 🔥 УВЕДОМЛЯЕМ РОДИТЕЛЯ
       widget.onChanged?.call(_isFavorite);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isFavorite 
-              ? 'Добавлено в избранное' 
-              : 'Удалено из избранного'),
-          duration: Duration(seconds: 1),
+          content: Text(
+            _isFavorite ? 'Добавлено в избранное' : 'Удалено из избранного',
+          ),
+          duration: const Duration(seconds: 1),
         ),
       );
     } else {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка при обновлении избранного'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -88,10 +80,7 @@ class _FavoriteButtonState extends State<FavoriteButton> {
           ? SizedBox(
               width: widget.size,
               height: widget.size,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(widget.color),
-              ),
+              child: const CircularProgressIndicator(strokeWidth: 2),
             )
           : Icon(
               _isFavorite ? Icons.favorite : Icons.favorite_border,
