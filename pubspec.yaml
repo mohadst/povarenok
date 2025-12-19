@@ -11,8 +11,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_tts: ^3.8.3  # Библеотека для синтеза речи
-  speech_to_text: ^7.2.0
+  cupertino_icons: ^1.0.6
+  speech_to_text: ^6.6.0
+  flutter_tts: ^4.2.0  # Обновленная версия
 
 dev_dependencies:
   flutter_test:

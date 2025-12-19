@@ -1,7 +1,8 @@
+import 'dart:async'; // Добавьте этот импорт для Timer
 import 'package:flutter/material.dart';
 import '../data/recipes.dart';
 import '../services/tts_service.dart';
-import '../services/speech_service.dart'; // Добавьте этот импорт
+import '../services/speech_service.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
@@ -18,9 +19,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   bool _isFavorite = false;
   bool _isListening = false;
   String _recognizedText = '';
-  
-  // Добавьте переменную для автоматического продолжения
   bool _autoContinue = false;
+  Timer? _speechCheckTimer;
 
   @override
   void initState() {
@@ -31,24 +31,38 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   Future<void> _initializeServices() async {
     await TtsService.init();
     await SpeechService.initialize();
-    
-    // Настроить callback для TTS
-    // Этот метод будет вызван, когда TTS закончит говорить
-    // В FlutterTts нет прямого callback, поэтому используем другой подход
   }
 
-  void _speakCurrentStep() {
+  void _onSpeechComplete() {
+    if (_autoContinue && mounted) {
+      setState(() {
+        _isSpeaking = false;
+      });
+      _startListeningForContinue();
+    } else {
+      setState(() {
+        _isSpeaking = false;
+      });
+    }
+  }
+
+  Future<void> _speakCurrentStep() async {
+    if (_currentStepIndex >= widget.recipe.steps.length) return;
+    
     final currentStep = widget.recipe.steps[_currentStepIndex];
-    TtsService.speak(currentStep.instruction).then((_) {
-      // Когда речь закончится, начинаем слушать команду "продолжить"
-      if (_autoContinue) {
-        _startListeningForContinue();
-      }
-    });
     
     setState(() {
       _isSpeaking = true;
+      _isListening = false;
     });
+    
+    await TtsService.stop();
+    await SpeechService.stopListening();
+    
+    // Ждем немного перед началом речи
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    await TtsService.speak(currentStep.instruction, onComplete: _onSpeechComplete);
   }
 
   void _startListeningForContinue() {
@@ -58,44 +72,85 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
     });
 
     SpeechService.startListening((text) {
-      setState(() {
-        _recognizedText = text;
-        _isListening = false;
-      });
-
-      // Проверяем команды
-      if (text.contains('продолжить') || 
-          text.contains('дальше') || 
-          text.contains('следующий') ||
-          text.contains('next')) {
-        _nextStep();
-      } else if (text.contains('повторить') || 
-                text.contains('еще раз') ||
-                text.contains('repeat')) {
-        _speakCurrentStep();
-      } else if (text.contains('предыдущий') || 
-                text.contains('назад') ||
-                text.contains('back')) {
-        _previousStep();
-      } else if (text.contains('стоп') || 
-                text.contains('остановить') ||
-                text.contains('stop')) {
-        _stopSpeaking();
-      } else {
-        // Если команда не распознана, повторяем шаг
-        _speakCurrentStep();
-      }
+      _processVoiceCommand(text);
     });
   }
 
-  void _stopSpeaking() {
-    TtsService.stop();
-    SpeechService.stopListening();
+  void _processVoiceCommand(String text) {
+    if (!mounted) return;
     
+    setState(() {
+      _recognizedText = text;
+      _isListening = false;
+    });
+
+    // Очищаем текст через 3 секунды
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _recognizedText = '';
+        });
+      }
+    });
+
+    // Проверяем команды (более гибкое распознавание)
+    final lowerText = text.toLowerCase();
+    
+    if (lowerText.contains('продолжи') || 
+        lowerText.contains('дальше') || 
+        lowerText.contains('следующий') ||
+        lowerText.contains('next') ||
+        lowerText.contains('вперёд') ||
+        lowerText.contains('вперед')) {
+      _nextStep();
+    } else if (lowerText.contains('повтори') || 
+              lowerText.contains('еще раз') ||
+              lowerText.contains('ещё раз') ||
+              lowerText.contains('repeat') ||
+              lowerText.contains('заново')) {
+      _repeatStep();
+    } else if (lowerText.contains('предыдущий') || 
+              lowerText.contains('назад') ||
+              lowerText.contains('back') ||
+              lowerText.contains('вернись')) {
+      _previousStep();
+    } else if (lowerText.contains('стоп') || 
+              lowerText.contains('останови') ||
+              lowerText.contains('stop') ||
+              lowerText.contains('хватит')) {
+      _stopAll();
+    } else if (lowerText.contains('старт') ||
+              lowerText.contains('начать') ||
+              lowerText.contains('start')) {
+      _speakCurrentStep();
+    } else if (lowerText.contains('первый шаг') ||
+              lowerText.contains('сначала')) {
+      _goToFirstStep();
+    } else if (lowerText.contains('сколько шагов') ||
+              lowerText.contains('сколько осталось')) {
+      _speakStepsInfo();
+    } else if (lowerText.contains('что сейчас') ||
+              lowerText.contains('текущий шаг')) {
+      _speakCurrentStep();
+    } else {
+      // Если команда не распознана, ждем новую команду
+      if (_autoContinue) {
+        _startListeningForContinue();
+      }
+    }
+  }
+
+  void _repeatStep() {
     setState(() {
       _isSpeaking = false;
       _isListening = false;
-      _autoContinue = false;
+    });
+    
+    TtsService.stop();
+    SpeechService.stopListening();
+    
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _speakCurrentStep();
     });
   }
 
@@ -110,19 +165,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
       TtsService.stop();
       SpeechService.stopListening();
       
-      // Автоматически начинаем говорить следующий шаг
       Future.delayed(const Duration(milliseconds: 500), () {
         _speakCurrentStep();
       });
     } else {
-      // Если это последний шаг
-      setState(() {
-        _isSpeaking = false;
-        _isListening = false;
-        _autoContinue = false;
-      });
-      
-      TtsService.speak('Рецепт завершен! Приятного аппетита!');
+      _completeRecipe();
     }
   }
 
@@ -140,23 +187,112 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
       Future.delayed(const Duration(milliseconds: 500), () {
         _speakCurrentStep();
       });
+    } else {
+      TtsService.speak('Это первый шаг', onComplete: () {
+        if (_autoContinue) {
+          _startListeningForContinue();
+        }
+      });
     }
   }
 
-  // Метод для включения/выключения авто-продолжения
+  void _goToFirstStep() {
+    setState(() {
+      _currentStepIndex = 0;
+      _isSpeaking = false;
+      _isListening = false;
+    });
+    
+    TtsService.stop();
+    SpeechService.stopListening();
+    
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _speakCurrentStep();
+    });
+  }
+
+  void _speakStepsInfo() {
+    final remaining = widget.recipe.steps.length - (_currentStepIndex + 1);
+    final message = remaining == 0 
+        ? 'Это последний шаг'
+        : 'Осталось $remaining ${_getStepsWord(remaining)}';
+    
+    TtsService.speak(message, onComplete: () {
+      if (_autoContinue) {
+        _startListeningForContinue();
+      }
+    });
+  }
+
+  String _getStepsWord(int count) {
+    if (count % 10 == 1 && count % 100 != 11) return 'шаг';
+    if (count % 10 >= 2 && count % 10 <= 4 && 
+        (count % 100 < 10 || count % 100 >= 20)) return 'шага';
+    return 'шагов';
+  }
+
+  void _completeRecipe() {
+    setState(() {
+      _isSpeaking = false;
+      _isListening = false;
+      _autoContinue = false;
+    });
+    
+    TtsService.stop();
+    SpeechService.stopListening();
+    
+    TtsService.speak('Рецепт завершён! Приятного аппетита!');
+    
+    // Показываем сообщение о завершении
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Рецепт завершён!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+        action: SnackBarAction(
+          label: 'OK',
+          onPressed: () {},
+          textColor: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  void _stopAll() {
+    setState(() {
+      _isSpeaking = false;
+      _isListening = false;
+      _autoContinue = false;
+    });
+    
+    TtsService.stop();
+    SpeechService.stopListening();
+  }
+
   void _toggleAutoContinue() {
     setState(() {
       _autoContinue = !_autoContinue;
     });
     
-    if (_autoContinue && !_isSpeaking) {
-      _speakCurrentStep();
+    if (_autoContinue) {
+      // Если включаем авто-продолжение и сейчас не говорим, начинаем
+      if (!_isSpeaking) {
+        _speakCurrentStep();
+      }
+    } else {
+      // Если выключаем, останавливаем прослушивание
+      SpeechService.stopListening();
+      setState(() {
+        _isListening = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentStep = widget.recipe.steps[_currentStepIndex];
+    final currentStep = _currentStepIndex < widget.recipe.steps.length
+        ? widget.recipe.steps[_currentStepIndex]
+        : RecipeStep(number: 0, instruction: 'Рецепт завершён');
 
     return Scaffold(
       appBar: AppBar(
@@ -171,7 +307,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
               color: _autoContinue ? Colors.green : Colors.white,
             ),
             onPressed: _toggleAutoContinue,
-            tooltip: _autoContinue ? 'Авто-продолжение включено' : 'Авто-продолжение выключено',
+            tooltip: _autoContinue 
+              ? 'Авто-продолжение включено. Скажите "продолжить" для следующего шага'
+              : 'Включить авто-продолжение',
           ),
           IconButton(
             icon: Icon(
@@ -184,27 +322,116 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
               });
             },
           ),
-          if (_isSpeaking)
-            IconButton(
-              onPressed: _stopSpeaking,
-              icon: const Icon(Icons.stop),
-              tooltip: 'Остановить',
-            ),
         ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ... существующий код изображения и информации ...
+            // Изображение рецепта
+            Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+                child: Image.network(
+                  widget.recipe.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.shade300,
+                      child: const Icon(
+                        Icons.restaurant_menu,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
 
-            // Текущий шаг (добавьте индикатор прослушивания)
+            // Информация о рецепте
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.recipe.title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.list, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${widget.recipe.ingredients.length} ингредиентов',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(Icons.timer, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${widget.recipe.steps.length} шагов',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Прогресс-бар
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: LinearProgressIndicator(
+                value: (_currentStepIndex + 1) / widget.recipe.steps.length,
+                backgroundColor: Colors.grey.shade200,
+                color: Colors.orange,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Шаг ${_currentStepIndex + 1} из ${widget.recipe.steps.length}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '${((_currentStepIndex + 1) / widget.recipe.steps.length * 100).round()}%',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+
+            // Текущий шаг
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Card(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),
+                color: Colors.orange.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -228,10 +455,10 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                               ),
                               const SizedBox(width: 12),
                               const Text(
-                                'Шаг',
+                                'Текущий шаг',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.grey,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
@@ -242,16 +469,18 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.green.shade200),
                               ),
                               child: Row(
                                 children: [
                                   Icon(Icons.volume_up, size: 16, color: Colors.green.shade800),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Говорит...',
+                                    'Говорит',
                                     style: TextStyle(
                                       color: Colors.green.shade800,
                                       fontSize: 12,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
@@ -263,16 +492,18 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.blue.shade50,
                                 borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.blue.shade200),
                               ),
                               child: Row(
                                 children: [
                                   Icon(Icons.mic, size: 16, color: Colors.blue.shade800),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Слушает...',
+                                    'Слушает',
                                     style: TextStyle(
                                       color: Colors.blue.shade800,
                                       fontSize: 12,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
@@ -288,16 +519,31 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                           height: 1.6,
                         ),
                       ),
-                      // Показать распознанный текст
-                      if (_recognizedText.isNotEmpty && _isListening)
+                      if (_recognizedText.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
-                          child: Text(
-                            'Распознано: "$_recognizedText"',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.blue.shade700,
-                              fontStyle: FontStyle.italic,
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.blue.shade100),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.mic, size: 16, color: Colors.blue.shade700),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Распознано: "$_recognizedText"',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.blue.shade800,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -307,7 +553,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
               ),
             ),
 
-            // Голосовые команды (добавьте новую секцию)
+            // Голосовые команды
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Card(
@@ -330,24 +576,55 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      Text(
+                        'Скажите одну из команд после звукового сигнала:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           _buildVoiceCommandChip('Продолжить / Дальше'),
                           _buildVoiceCommandChip('Повторить'),
-                          _buildVoiceCommandChip('Предыдущий'),
+                          _buildVoiceCommandChip('Предыдущий шаг'),
                           _buildVoiceCommandChip('Стоп'),
+                          _buildVoiceCommandChip('Начать сначала'),
+                          _buildVoiceCommandChip('Сколько осталось'),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        _autoContinue 
-                          ? '✓ Режим авто-продолжения включен. После каждого шага скажите "Продолжить"'
-                          : 'Нажмите на иконку микрофона вверху для включения авто-продолжения',
-                        style: TextStyle(
-                          color: _autoContinue ? Colors.green : Colors.grey,
-                          fontSize: 14,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _autoContinue ? Colors.green.shade50 : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _autoContinue ? Colors.green.shade200 : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _autoContinue ? Icons.check_circle : Icons.info,
+                              color: _autoContinue ? Colors.green : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _autoContinue 
+                                  ? '✓ Авто-продолжение включено. После каждого шага скажите "Продолжить"'
+                                  : 'Нажмите на иконку микрофона вверху для включения авто-продолжения',
+                                style: TextStyle(
+                                  color: _autoContinue ? Colors.green.shade800 : Colors.grey.shade700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -363,11 +640,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _previousStep,
+                      onPressed: _currentStepIndex > 0 ? _previousStep : null,
                       icon: const Icon(Icons.arrow_back),
                       label: const Text('Назад'),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -377,11 +654,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _nextStep,
+                      onPressed: _currentStepIndex < widget.recipe.steps.length - 1 ? _nextStep : null,
                       icon: const Text('Вперед'),
                       label: const Icon(Icons.arrow_forward),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -399,9 +676,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                 children: [
                   // Основная кнопка озвучки
                   ElevatedButton.icon(
-                    onPressed: _isSpeaking ? _stopSpeaking : _speakCurrentStep,
+                    onPressed: _isSpeaking ? _stopAll : _speakCurrentStep,
                     icon: Icon(_isSpeaking ? Icons.stop : Icons.record_voice_over),
-                    label: Text(_isSpeaking ? 'Остановить озвучку' : 'Озвучить этот шаг'),
+                    label: Text(_isSpeaking ? 'Остановить' : 'Озвучить этот шаг'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _isSpeaking ? Colors.red : Colors.orange,
                       foregroundColor: Colors.white,
@@ -417,7 +694,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                     OutlinedButton.icon(
                       onPressed: _startListeningForContinue,
                       icon: Icon(_isListening ? Icons.mic_off : Icons.mic),
-                      label: Text(_isListening ? 'Остановить прослушивание' : 'Сказать "Продолжить"'),
+                      label: Text(_isListening ? 'Остановить' : 'Сказать команду'),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
                         shape: RoundedRectangleBorder(
@@ -429,7 +706,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
               ),
             ),
 
-            // ... существующий код прогресса ...
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -449,6 +726,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
 
   @override
   void dispose() {
+    _speechCheckTimer?.cancel();
     TtsService.stop();
     SpeechService.stopListening();
     super.dispose();
