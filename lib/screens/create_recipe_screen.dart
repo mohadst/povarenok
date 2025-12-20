@@ -11,8 +11,12 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _imageUrlController = TextEditingController();
-  final List<TextEditingController> _ingredientControllers = [TextEditingController()];
-  final List<TextEditingController> _stepControllers = [TextEditingController()];
+  final List<TextEditingController> _ingredientControllers = [
+    TextEditingController()
+  ];
+  final List<TextEditingController> _stepControllers = [
+    TextEditingController()
+  ];
 
   @override
   void dispose() {
@@ -62,7 +66,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
           .where((c) => c.text.isNotEmpty)
           .map((c) => c.text)
           .toList();
-      
+
       final steps = _stepControllers
           .where((c) => c.text.isNotEmpty)
           .map((c) => c.text)
@@ -193,7 +197,8 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Ингредиент ${index + 1}',
                                     border: const OutlineInputBorder(),
-                                    prefixIcon: const Icon(Icons.check_box_outline_blank),
+                                    prefixIcon: const Icon(
+                                        Icons.check_box_outline_blank),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
@@ -205,8 +210,10 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                               ),
                               if (_ingredientControllers.length > 1)
                                 IconButton(
-                                  icon: const Icon(Icons.remove_circle, color: Colors.red),
-                                  onPressed: () => _removeIngredientField(index),
+                                  icon: const Icon(Icons.remove_circle,
+                                      color: Colors.red),
+                                  onPressed: () =>
+                                      _removeIngredientField(index),
                                 ),
                             ],
                           ),
@@ -285,7 +292,8 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                                       maxLines: 3,
                                       decoration: const InputDecoration(
                                         border: OutlineInputBorder(),
-                                        hintText: 'Опишите этот шаг приготовления...',
+                                        hintText:
+                                            'Опишите этот шаг приготовления...',
                                       ),
                                       validator: (value) {
                                         if (value == null || value.isEmpty) {
@@ -297,7 +305,8 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                                   ),
                                   if (_stepControllers.length > 1)
                                     IconButton(
-                                      icon: const Icon(Icons.remove_circle, color: Colors.red),
+                                      icon: const Icon(Icons.remove_circle,
+                                          color: Colors.red),
                                       onPressed: () => _removeStepField(index),
                                     ),
                                 ],
@@ -322,7 +331,8 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
