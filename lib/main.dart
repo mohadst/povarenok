@@ -3,6 +3,7 @@ import 'screens/recipes_screen.dart';
 import 'screens/create_recipe_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/profile_screen.dart';
+import 'theme/retro_70s_theme.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,14 +15,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cooking Assistant',
-      theme: ThemeData(
-        primarySwatch: Colors.orange,
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-      ),
-      home: const MainNavigationScreen(),
       debugShowCheckedModeBanner: false,
+      title: 'Cooking Assistant',
+      theme: Retro70sTheme.lightTheme,
+      home: const MainNavigationScreen(),
     );
   }
 }
@@ -36,11 +33,12 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
-  static final List<Widget> _screens = [
-    const RecipesScreen(),
-    const FavoritesScreen(),
-    const CreateRecipeScreen(),
-    const ProfileScreen(),
+  // Используем const конструкторы для всех экранов
+  static const List<Widget> _screens = [
+    RecipesScreen(),
+    FavoritesScreen(),
+    CreateRecipeScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
