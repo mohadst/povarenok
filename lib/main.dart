@@ -1,3 +1,5 @@
+import 'package:cooking_assistant/ai/memory.dart';
+import 'package:cooking_assistant/screens/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'screens/recipes_screen.dart';
 import 'screens/create_recipe_screen.dart';
@@ -41,6 +43,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const FavoritesScreen(),
     const CreateRecipeScreen(),
     const ProfileScreen(),
+    const ChatPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -89,6 +92,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.person),
                 label: 'Профиль',
+              ),
+               BottomNavigationBarItem(
+                icon: Icon(Icons.person),
+                label: 'Чат',
               ),
             ],
             currentIndex: _selectedIndex,
