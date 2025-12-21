@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../data/recipes.dart';
+import '../data/recipes_data.dart';
 import '../theme/retro_colors.dart';
 import '../widgets/retro_card.dart';
 import '../screens/recipe_detail_screen.dart';

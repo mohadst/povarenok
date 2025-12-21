@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import '../data/recipes.dart';
+import '../data/recipes_data.dart';
 import '../theme/retro_colors.dart';
 import '../widgets/retro_card.dart';
 import 'dart:math';
 
 class CreateRecipeScreen extends StatefulWidget {
-  const CreateRecipeScreen({super.key});
+  final VoidCallback? onRecipeCreated;
+  
+  const CreateRecipeScreen({
+    super.key,
+    this.onRecipeCreated,
+  });
 
   @override
   State<CreateRecipeScreen> createState() => _CreateRecipeScreenState();
@@ -24,6 +29,8 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
   ];
 
   late final AnimationController _animationController;
+  final RecipeStorage _recipeStorage = RecipeStorage();
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -32,6 +39,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
+    _recipeStorage.initializeWithDemoRecipes();
   }
 
   @override
@@ -46,35 +54,100 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
 
   void _addIngredient() =>
       setState(() => _ingredientControllers.add(TextEditingController()));
+  
   void _addStep() =>
       setState(() => _stepControllers.add(TextEditingController()));
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    setState(() {
+      _isSubmitting = true;
+    });
 
-    final ingredients = _ingredientControllers.map((c) => c.text).toList();
-    final steps = _stepControllers
+    // Небольшая задержка для анимации
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final ingredients = _ingredientControllers
+        .where((controller) => controller.text.isNotEmpty)
+        .toList()
         .asMap()
         .entries
-        .map((e) => RecipeStep(number: e.key + 1, instruction: e.value.text))
+        .map((e) => e.value.text)
         .toList();
 
-    demoRecipes.add(
-      Recipe(
-        id: DateTime.now().toString(),
-        title: _titleController.text,
-        imageUrl: _imageUrlController.text.isNotEmpty
-            ? _imageUrlController.text
-            : 'https://via.placeholder.com/600x400',
-        ingredients: ingredients,
-        steps: steps,
+    final steps = _stepControllers
+        .where((controller) => controller.text.isNotEmpty)
+        .toList()
+        .asMap()
+        .entries
+        .map((e) => RecipeStep(
+              number: e.key + 1,
+              instruction: e.value.text,
+            ))
+        .toList();
+
+    // Создаем новый рецепт
+    final newRecipe = Recipe(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _titleController.text,
+      imageUrl: _imageUrlController.text.isNotEmpty
+          ? _imageUrlController.text
+          : 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600',
+      ingredients: ingredients,
+      steps: steps,
+      isFavorite: false,
+    );
+
+    // Сохраняем рецепт
+    _recipeStorage.addRecipe(newRecipe);
+
+    // Уведомляем о создании рецепта
+    widget.onRecipeCreated?.call();
+
+    // Простое уведомление без кнопки действия
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          '✅ Рецепт успешно создан!',
+          style: TextStyle(fontSize: 16),
+        ),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3), // Автоматически исчезает через 3 секунды
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
       ),
     );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Рецепт сохранён 💛')),
-    );
-    Navigator.pop(context);
+    // Очищаем форму через 1 секунду
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        _clearForm();
+      }
+    });
+  }
+
+  void _clearForm() {
+    _titleController.clear();
+    _imageUrlController.clear();
+    for (var controller in _ingredientControllers) {
+      controller.clear();
+    }
+    for (var controller in _stepControllers) {
+      controller.clear();
+    }
+    setState(() {
+      _ingredientControllers.clear();
+      _stepControllers.clear();
+      _ingredientControllers.add(TextEditingController());
+      _stepControllers.add(TextEditingController());
+    });
   }
 
   InputDecoration _input(String label, IconData icon) {
@@ -87,6 +160,14 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: RetroColors.cocoa.withOpacity(0.5)),
       ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: RetroColors.cocoa.withOpacity(0.3)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: RetroColors.mustard),
+      ),
     );
   }
 
@@ -97,7 +178,10 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
       appBar: AppBar(
         title: const Text(
           'Создать рецепт',
-          style: TextStyle(fontFamily: 'Georgia', fontWeight: FontWeight.bold),
+          style: TextStyle(
+              fontFamily: 'Georgia',
+              fontWeight: FontWeight.bold,
+              fontSize: 22),
         ),
         backgroundColor: RetroColors.cherryRed,
         foregroundColor: Colors.white,
@@ -106,6 +190,13 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.clear_all),
+            onPressed: _isSubmitting ? null : _clearForm,
+            tooltip: 'Очистить форму',
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -140,14 +231,19 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
                           decoration:
                               _input('Название рецепта', Icons.restaurant),
                           validator: (v) => v == null || v.isEmpty
-                              ? 'Введите название'
+                              ? 'Введите название рецепта'
                               : null,
+                          textInputAction: TextInputAction.next,
+                          enabled: !_isSubmitting,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _imageUrlController,
                           decoration: _input(
                               'URL изображения (необязательно)', Icons.image),
+                          textInputAction: TextInputAction.next,
+                          keyboardType: TextInputType.url,
+                          enabled: !_isSubmitting,
                         ),
                       ],
                     ),
@@ -157,18 +253,42 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _sectionHeader('Ингредиенты', _addIngredient),
+                        _sectionHeader('Ингредиенты', 
+                            _isSubmitting ? null : _addIngredient),
                         const SizedBox(height: 12),
                         ..._ingredientControllers.asMap().entries.map(
                               (e) => Padding(
                                 padding: const EdgeInsets.only(bottom: 10),
-                                child: TextFormField(
-                                  controller: e.value,
-                                  decoration: _input(
-                                      'Ингредиент ${e.key + 1}', Icons.check),
-                                  validator: (v) => v == null || v.isEmpty
-                                      ? 'Введите ингредиент'
-                                      : null,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: e.value,
+                                        decoration: _input(
+                                            'Ингредиент ${e.key + 1}', Icons.check),
+                                        validator: (v) =>
+                                            v == null || v.isEmpty
+                                                ? 'Введите ингредиент'
+                                                : null,
+                                        textInputAction: e.key ==
+                                                _ingredientControllers.length - 1
+                                            ? TextInputAction.done
+                                            : TextInputAction.next,
+                                        enabled: !_isSubmitting,
+                                      ),
+                                    ),
+                                    if (_ingredientControllers.length > 1 && !_isSubmitting)
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle,
+                                            color: Colors.red),
+                                        onPressed: () {
+                                          setState(() {
+                                            _ingredientControllers
+                                                .removeAt(e.key);
+                                          });
+                                        },
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -180,20 +300,59 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _sectionHeader('Шаги приготовления', _addStep),
+                        _sectionHeader('Шаги приготовления', 
+                            _isSubmitting ? null : _addStep),
                         const SizedBox(height: 12),
                         ..._stepControllers.asMap().entries.map(
                               (e) => Padding(
                                 padding: const EdgeInsets.only(bottom: 14),
-                                child: TextFormField(
-                                  controller: e.value,
-                                  minLines: 2,
-                                  maxLines: 4,
-                                  decoration: _input('Шаг ${e.key + 1}',
-                                      Icons.format_list_numbered),
-                                  validator: (v) => v == null || v.isEmpty
-                                      ? 'Введите шаг'
-                                      : null,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: RetroColors.mustard,
+                                      child: Text(
+                                        '${e.key + 1}',
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: e.value,
+                                        minLines: 2,
+                                        maxLines: 4,
+                                        decoration: InputDecoration(
+                                          hintText: 'Опишите шаг ${e.key + 1}',
+                                          border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.all(12),
+                                        ),
+                                        validator: (v) =>
+                                            v == null || v.isEmpty
+                                                ? 'Введите описание шага'
+                                                : null,
+                                        enabled: !_isSubmitting,
+                                      ),
+                                    ),
+                                    if (_stepControllers.length > 1 && !_isSubmitting)
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle,
+                                            color: Colors.red),
+                                        onPressed: () {
+                                          setState(() {
+                                            _stepControllers.removeAt(e.key);
+                                          });
+                                        },
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -201,19 +360,66 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
                     ),
                   ),
                   const SizedBox(height: 30),
-                  ElevatedButton.icon(
-                    onPressed: _submit,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Сохранить рецепт'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 56),
-                      backgroundColor: RetroColors.mustard,
-                      foregroundColor: RetroColors.cocoa,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      elevation: 8,
+                  if (_isSubmitting)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                RetroColors.mustard),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Сохраняю рецепт...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: RetroColors.cocoa,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            icon: const Icon(Icons.arrow_back),
+                            label: const Text('Отмена'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 56),
+                              backgroundColor: Colors.white,
+                              foregroundColor: RetroColors.cocoa,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              side: BorderSide(
+                                  color: RetroColors.cocoa.withOpacity(0.5)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _submit,
+                            icon: const Icon(Icons.save),
+                            label: const Text('Сохранить рецепт'),
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(0, 56),
+                              backgroundColor: RetroColors.mustard,
+                              foregroundColor: RetroColors.cocoa,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              elevation: 8,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -223,23 +429,33 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
     );
   }
 
-  Widget _sectionHeader(String title, VoidCallback onAdd) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: RetroColors.cocoa),
-        ),
-        IconButton(
-          onPressed: onAdd,
-          icon: const Icon(Icons.add_circle),
-          color: RetroColors.burntOrange,
-        ),
-      ],
+  Widget _sectionHeader(String title, VoidCallback? onAdd) {
+    return Container(
+      decoration: BoxDecoration(
+        color: RetroColors.paper,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: RetroColors.mustard.withOpacity(0.5)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: RetroColors.cocoa),
+          ),
+          IconButton(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_circle),
+            color: RetroColors.burntOrange,
+            iconSize: 28,
+            disabledColor: Colors.grey,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -253,7 +469,10 @@ class _VibeRetroCard extends StatelessWidget {
     return Stack(
       children: [
         RetroCard(
-          child: child,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: child,
+          ),
         ),
         Positioned(
           top: -10,

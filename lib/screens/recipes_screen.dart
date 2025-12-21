@@ -1,17 +1,57 @@
 import 'package:flutter/material.dart';
-import '../data/recipes.dart';
+import '../data/recipes_data.dart';
 import '../theme/retro_colors.dart';
 import 'recipe_detail_screen.dart';
 import 'dart:math';
 
-class RecipesScreen extends StatelessWidget {
-  const RecipesScreen({super.key});
+class RecipesScreen extends StatefulWidget {
+  const RecipesScreen({Key? key}) : super(key: key);
+
+  @override
+  RecipesScreenState createState() => RecipesScreenState();
+}
+
+class RecipesScreenState extends State<RecipesScreen> {
+  final RecipeStorage _recipeStorage = RecipeStorage();
+  List<Recipe> _recipes = [];
+  String _searchQuery = '';
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    loadRecipes();
+  }
+
+  // Сделайте метод публичным, убрав нижнее подчеркивание
+  void loadRecipes() {
+    _recipeStorage.initializeWithDemoRecipes();
+    setState(() {
+      _recipes = _recipeStorage.getAllRecipes();
+    });
+  }
+
+  void _toggleFavorite(String recipeId) {
+    _recipeStorage.toggleFavorite(recipeId);
+    setState(() {
+      _recipes = _recipeStorage.getAllRecipes();
+    });
+  }
+
+  void _onSearch(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final cardWidthSmall = (screenWidth - 48) / 2;
-    final cardWidthLarge = screenWidth - 32;
+    
+    // Фильтрация рецептов по поисковому запросу
+    final filteredRecipes = _searchQuery.isEmpty
+        ? _recipes
+        : _recipeStorage.searchRecipes(_searchQuery);
 
     return Scaffold(
       backgroundColor: RetroColors.paper,
@@ -32,167 +72,451 @@ class RecipesScreen extends StatelessWidget {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
         ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              onChanged: _onSearch,
+              decoration: InputDecoration(
+                hintText: 'Поиск рецептов...',
+                prefixIcon: const Icon(Icons.search, color: RetroColors.cocoa),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.9),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: Stack(
         children: [
           Positioned.fill(
             child: CustomPaint(painter: _BackgroundPainter()),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: LayoutBuilder(builder: (context, constraints) {
-              return Wrap(
-                spacing: 16,
-                runSpacing: 24,
-                children: List.generate(demoRecipes.length, (index) {
-                  final recipe = demoRecipes[index];
-                  final isLarge = index % 3 == 0;
-                  final cardWidth = isLarge ? cardWidthLarge : cardWidthSmall;
-
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              RecipeDetailScreen(recipe: recipe),
+          filteredRecipes.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.restaurant_menu,
+                        size: 80,
+                        color: RetroColors.mustard.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        _searchQuery.isEmpty
+                            ? 'Нет рецептов'
+                            : 'Рецепты не найдены',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          color: RetroColors.cocoa,
+                          fontWeight: FontWeight.bold,
                         ),
-                      );
-                    },
-                    child: Container(
-                      width: cardWidth,
-                      decoration: BoxDecoration(
-                        color: RetroColors.paper.withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: RetroColors.cocoa.withOpacity(0.2),
-                            blurRadius: 4,
-                            offset: const Offset(2, 2),
-                          ),
-                        ],
                       ),
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: Padding(
-                              padding: const EdgeInsets.all(3),
-                              child: CustomPaint(
-                                painter: _DoubleBorderPainter(),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Icon(Icons.star,
-                                size: 10,
-                                color:
-                                    RetroColors.burntOrange.withOpacity(0.6)),
-                          ),
-                          Positioned(
-                            bottom: 8,
-                            right: 8,
-                            child: Icon(Icons.star,
-                                size: 10,
-                                color: RetroColors.avocado.withOpacity(0.6)),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(12),
-                                    topRight: Radius.circular(12)),
-                                child: Image.network(
-                                  recipe.imageUrl,
-                                  width: double.infinity,
-                                  height: isLarge ? 180 : 120,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: double.infinity,
-                                    height: isLarge ? 180 : 120,
-                                    color: RetroColors.mustard.withOpacity(0.3),
-                                    child: const Icon(Icons.restaurant_menu),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      recipe.title,
-                                      style: const TextStyle(
-                                        fontFamily: 'Georgia',
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: RetroColors.cocoa,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _InfoBadge(
-                                            icon: Icons.kitchen,
-                                            text:
-                                                '${recipe.ingredients.length} ингредиентов',
-                                            color: RetroColors.mustard
-                                                .withOpacity(0.2),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: _InfoBadge(
-                                            icon: Icons.timer,
-                                            text:
-                                                '${recipe.steps.length * 5} мин',
-                                            color: RetroColors.avocado
-                                                .withOpacity(0.2),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: LinearProgressIndicator(
-                                        value: 0.7,
-                                        minHeight: 6,
-                                        backgroundColor: RetroColors.mustard
-                                            .withOpacity(0.3),
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                RetroColors.mustard),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Icon(
-                              Icons.favorite_border,
-                              color: RetroColors.burntOrange,
-                              size: 26,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 10),
+                      Text(
+                        _searchQuery.isEmpty
+                            ? 'Создайте первый рецепт!'
+                            : 'Попробуйте другой запрос',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: RetroColors.cocoa.withOpacity(0.6),
+                        ),
                       ),
-                    ),
-                  );
-                }),
-              );
-            }),
-          ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: () async {
+                    loadRecipes();
+                  },
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.all(16.0),
+                        sliver: SliverGrid(
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 24,
+                            childAspectRatio: 0.75,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final recipe = filteredRecipes[index];
+                              final isLarge = index % 3 == 0;
+                              
+                              if (isLarge) {
+                                return _LargeRecipeCard(
+                                  recipe: recipe,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            RecipeDetailScreen(recipe: recipe),
+                                      ),
+                                    );
+                                  },
+                                  onToggleFavorite: () {
+                                    _toggleFavorite(recipe.id);
+                                  },
+                                );
+                              } else {
+                                return _SmallRecipeCard(
+                                  recipe: recipe,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            RecipeDetailScreen(recipe: recipe),
+                                      ),
+                                    );
+                                  },
+                                  onToggleFavorite: () {
+                                    _toggleFavorite(recipe.id);
+                                  },
+                                );
+                              }
+                            },
+                            childCount: filteredRecipes.length,
+                          ),
+                        ),
+                      ),
+                      const SliverPadding(
+                        padding: EdgeInsets.only(bottom: 100),
+                      ),
+                    ],
+                  ),
+                ),
         ],
+      ),
+      floatingActionButton: filteredRecipes.isNotEmpty
+          ? FloatingActionButton(
+              onPressed: () {
+                _scrollController.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut,
+                );
+              },
+              backgroundColor: RetroColors.cherryRed,
+              child: const Icon(Icons.arrow_upward, color: Colors.white),
+              mini: true,
+            )
+          : null,
+    );
+  }
+}
+
+class _SmallRecipeCard extends StatelessWidget {
+  final Recipe recipe;
+  final VoidCallback onTap;
+  final VoidCallback onToggleFavorite;
+
+  const _SmallRecipeCard({
+    required this.recipe,
+    required this.onTap,
+    required this.onToggleFavorite,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: RetroColors.paper.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: RetroColors.cocoa.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(2, 2),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(3),
+                child: CustomPaint(
+                  painter: _DoubleBorderPainter(),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Icon(Icons.star,
+                  size: 10,
+                  color: RetroColors.burntOrange.withOpacity(0.6)),
+            ),
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Icon(Icons.star,
+                  size: 10,
+                  color: RetroColors.avocado.withOpacity(0.6)),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12)),
+                  child: Image.network(
+                    recipe.imageUrl,
+                    width: double.infinity,
+                    height: 120,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: double.infinity,
+                      height: 120,
+                      color: RetroColors.mustard.withOpacity(0.3),
+                      child: const Icon(Icons.restaurant_menu),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          recipe.title,
+                          style: const TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: RetroColors.cocoa,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _InfoBadge(
+                                icon: Icons.kitchen,
+                                text: '${recipe.ingredients.length} ингр.',
+                                color: RetroColors.mustard.withOpacity(0.2),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _InfoBadge(
+                                icon: Icons.timer,
+                                text: '${recipe.steps.length * 5} мин',
+                                color: RetroColors.avocado.withOpacity(0.2),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: onToggleFavorite,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    recipe.isFavorite
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    color: recipe.isFavorite
+                        ? RetroColors.burntOrange
+                        : RetroColors.cocoa,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LargeRecipeCard extends StatelessWidget {
+  final Recipe recipe;
+  final VoidCallback onTap;
+  final VoidCallback onToggleFavorite;
+
+  const _LargeRecipeCard({
+    required this.recipe,
+    required this.onTap,
+    required this.onToggleFavorite,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: RetroColors.paper.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: RetroColors.cocoa.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(2, 2),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(3),
+                child: CustomPaint(
+                  painter: _DoubleBorderPainter(),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Icon(Icons.star,
+                  size: 10,
+                  color: RetroColors.burntOrange.withOpacity(0.6)),
+            ),
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Icon(Icons.star,
+                  size: 10,
+                  color: RetroColors.avocado.withOpacity(0.6)),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12)),
+                  child: Image.network(
+                    recipe.imageUrl,
+                    width: double.infinity,
+                    height: 180,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: double.infinity,
+                      height: 180,
+                      color: RetroColors.mustard.withOpacity(0.3),
+                      child: const Icon(Icons.restaurant_menu),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          recipe.title,
+                          style: const TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: RetroColors.cocoa,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _InfoBadge(
+                                icon: Icons.kitchen,
+                                text: '${recipe.ingredients.length} ингредиентов',
+                                color: RetroColors.mustard.withOpacity(0.2),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _InfoBadge(
+                                icon: Icons.timer,
+                                text: '${recipe.steps.length * 5} мин',
+                                color: RetroColors.avocado.withOpacity(0.2),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: 0.7,
+                            minHeight: 6,
+                            backgroundColor:
+                                RetroColors.mustard.withOpacity(0.3),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                RetroColors.mustard),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: onToggleFavorite,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    recipe.isFavorite
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    color: recipe.isFavorite
+                        ? RetroColors.burntOrange
+                        : RetroColors.cocoa,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

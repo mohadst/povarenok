@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../data/recipes.dart';
 import '../theme/retro_colors.dart';
+import '../data/recipes_data.dart';
 import '../services/tts_service.dart';
 import '../services/speech_service.dart';
 import '../widgets/retro_card.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
+  
   const RecipeDetailScreen({super.key, required this.recipe});
 
   @override
@@ -20,6 +21,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   bool _isListening = false;
   bool _autoContinue = false;
   String _recognizedText = '';
+
 
   @override
   void initState() {

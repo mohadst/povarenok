@@ -1,26 +1,50 @@
 import 'package:flutter/material.dart';
-import '../data/recipes.dart';
+import '../data/recipes_data.dart'; // Импортируйте новый файл
 import '../theme/retro_colors.dart';
 import 'recipe_detail_screen.dart';
 import 'dart:math';
 
-class FavoritesScreen extends StatelessWidget {
+class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
+
+  @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  final RecipeStorage _recipeStorage = RecipeStorage();
+  List<Recipe> _favoriteRecipes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteRecipes();
+  }
+
+  void _loadFavoriteRecipes() {
+    _recipeStorage.initializeWithDemoRecipes();
+    setState(() {
+      _favoriteRecipes = _recipeStorage.getFavoriteRecipes();
+    });
+  }
+
+  void _toggleFavorite(String recipeId) {
+    _recipeStorage.toggleFavorite(recipeId);
+    setState(() {
+      _favoriteRecipes = _recipeStorage.getFavoriteRecipes();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // Для теста пока все рецепты считаем "избранными"
-    final favoriteRecipes = demoRecipes;
-    // TODO: заменить на фильтр: demoRecipes.where((r) => r.isFavorite).toList();
-
     return Scaffold(
       backgroundColor: RetroColors.paper,
       appBar: AppBar(
-        title: const Text(
-          'Избранное',
-          style: TextStyle(
+        title: Text(
+          'Избранное (${_favoriteRecipes.length})',
+          style: const TextStyle(
             fontFamily: 'Georgia',
             fontWeight: FontWeight.bold,
             fontSize: 24,
@@ -36,7 +60,6 @@ class FavoritesScreen extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // Фон с Painter
           Positioned.fill(
             child: CustomPaint(
               painter: _BackgroundPainterFavorites(),
@@ -44,17 +67,20 @@ class FavoritesScreen extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: favoriteRecipes.isEmpty
+            child: _favoriteRecipes.isEmpty
                 ? const _EmptyFavorites()
                 : ListView.builder(
-                    itemCount: favoriteRecipes.length,
+                    itemCount: _favoriteRecipes.length,
                     itemBuilder: (context, index) {
-                      final recipe = favoriteRecipes[index];
+                      final recipe = _favoriteRecipes[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: _FavoriteRecipeCard(
                           recipe: recipe,
                           width: screenWidth - 32,
+                          onToggleFavorite: () {
+                            _toggleFavorite(recipe.id);
+                          },
                         ),
                       );
                     },
@@ -80,7 +106,6 @@ class _BackgroundPainterFavorites extends CustomPainter {
     paint.shader = gradient.createShader(rect);
     canvas.drawRect(rect, paint);
 
-    // линеееее
     paint.shader = null;
     paint.color = RetroColors.burntOrange.withOpacity(0.05);
     paint.strokeWidth = 1.5;
@@ -90,7 +115,6 @@ class _BackgroundPainterFavorites extends CustomPainter {
           Offset(x, 0), Offset(x + size.height, size.height), paint);
     }
 
-    // кургеее
     paint.color = RetroColors.mustard.withOpacity(0.1);
     canvas.drawCircle(Offset(80, 150), 60, paint);
     paint.color = RetroColors.avocado.withOpacity(0.08);
@@ -129,7 +153,7 @@ class _EmptyFavorites extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Добавляйте любимые рецепты,\nчтобы не потерять',
+              'Добавляйте любимые рецепты,\nнажав на сердечко',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: RetroColors.cocoa.withOpacity(0.6),
@@ -145,8 +169,13 @@ class _EmptyFavorites extends StatelessWidget {
 class _FavoriteRecipeCard extends StatelessWidget {
   final Recipe recipe;
   final double width;
+  final VoidCallback onToggleFavorite;
 
-  const _FavoriteRecipeCard({required this.recipe, required this.width});
+  const _FavoriteRecipeCard({
+    required this.recipe,
+    required this.width,
+    required this.onToggleFavorite,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -164,8 +193,8 @@ class _FavoriteRecipeCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: RetroColors.paper,
           borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: RetroColors.mustard.withOpacity(0.6), width: 2),
+          border: Border.all(
+              color: RetroColors.burntOrange.withOpacity(0.6), width: 2),
           boxShadow: [
             BoxShadow(
               color: RetroColors.cocoa.withOpacity(0.15),
@@ -234,6 +263,32 @@ class _FavoriteRecipeCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: onToggleFavorite,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.favorite,
+                        color: RetroColors.burntOrange,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             Padding(
@@ -256,8 +311,29 @@ class _FavoriteRecipeCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Icon(Icons.favorite,
-                      color: RetroColors.burntOrange, size: 28),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: RetroColors.burntOrange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.star,
+                            size: 16, color: RetroColors.burntOrange),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Избранное',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: RetroColors.burntOrange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
