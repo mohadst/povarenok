@@ -4,6 +4,8 @@ import '../theme/retro_colors.dart';
 import '../services/tts_service.dart';
 import '../services/speech_service.dart';
 import '../widgets/retro_card.dart';
+import '../screens/timer_screen.dart';
+import '../services/timer_manager.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
@@ -30,6 +32,20 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   Future<void> _initializeServices() async {
     await TtsService.init();
     await SpeechService.initialize();
+  }
+
+  void _openTimer() {
+    final timerManager = TimerManager();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TimerScreen(
+          title: widget.recipe.title,
+          timerManager: timerManager,
+        ),
+      ),
+    );
   }
 
   void _speakCurrentStep() {
@@ -145,6 +161,11 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
               color: _isFavorite ? RetroColors.burntOrange : Colors.white,
             ),
             onPressed: () => setState(() => _isFavorite = !_isFavorite),
+          ),
+          IconButton(
+            icon: const Icon(Icons.timer),
+            tooltip: 'Таймер',
+            onPressed: _openTimer,
           ),
           if (_isSpeaking)
             IconButton(

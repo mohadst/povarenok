@@ -3,8 +3,10 @@ import 'screens/recipes_screen.dart';
 import 'screens/create_recipe_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/chat_screen.dart'; // Импорт вашего ChatPage
+import 'screens/chat_screen.dart';
+import 'screens/timer_screen.dart';
 import 'theme/retro_70s_theme.dart';
+import 'services/timer_manager.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,17 +33,41 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
-  // Используем const для большинства экранов, кроме ChatPage который может иметь состояние
-  static final List<Widget> _screens = [
+  static final TimerManager _timerManager = TimerManager();
+
+  static TimerManager get timerManager => _timerManager;
+
+  final List<Widget> _screens = [
     const RecipesScreen(),
     const FavoritesScreen(),
     const CreateRecipeScreen(),
     const ProfileScreen(),
-    ChatPage(), // Убрали const так как ChatPage может иметь состояние
+    ChatPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timerManager.disposeAll();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      _timerManager.disposeAll();
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -49,10 +75,31 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
+  void _openTimerScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TimerScreen(
+          title: 'Таймеры готовки',
+          timerManager: _timerManager,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
+      floatingActionButton: _selectedIndex == 0 || _selectedIndex == 2
+          ? FloatingActionButton(
+              onPressed: _openTimerScreen,
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.timer_outlined),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.only(
@@ -96,7 +143,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ],
             currentIndex: _selectedIndex,
-            selectedItemColor: Colors.orange, // Сохраняем оранжевый цвет из ретро-темы
+            selectedItemColor: Colors.orange,
             unselectedItemColor: Colors.grey,
             showUnselectedLabels: true,
             type: BottomNavigationBarType.fixed,
