@@ -24,7 +24,7 @@ class SpeechService {
     if (!_isListening) {
       _onResultCallback = onResult;
       _isListening = true;
-      
+
       await _speech.listen(
         onResult: (result) {
           if (result.finalResult) {
@@ -53,7 +53,7 @@ class SpeechService {
 
   // Проверить, слушает ли сейчас
   static bool get isListening => _isListening;
-  
+
   // Для корректной работы с Flutter, используем debugPrint из foundation
   static void debugPrint(String message) {
     // В продакшене можно использовать logging framework, например, logger

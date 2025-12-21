@@ -1,196 +1,315 @@
 import 'package:flutter/material.dart';
 import '../data/recipes.dart';
+import '../theme/retro_colors.dart';
 import 'recipe_detail_screen.dart';
+import 'dart:math';
 
 class RecipesScreen extends StatelessWidget {
   const RecipesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Рецепты'),
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Быстрые категории
-          Container(
-            height: 70,
-            color: Colors.orange.shade50,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildCategoryChip('Завтрак', Icons.breakfast_dining),
-                _buildCategoryChip('Обед', Icons.lunch_dining),
-                _buildCategoryChip('Ужин', Icons.dinner_dining),
-                _buildCategoryChip('Десерты', Icons.cake),
-                _buildCategoryChip('Напитки', Icons.local_drink),
-              ],
-            ),
-          ),
-          // Список рецептов
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(8.0),
-              itemCount: demoRecipes.length,
-              itemBuilder: (context, index) {
-                final recipe = demoRecipes[index];
-                return RecipeCard(recipe: recipe);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardWidthSmall = (screenWidth - 48) / 2;
+    final cardWidthLarge = screenWidth - 32;
 
-  Widget _buildCategoryChip(String label, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Chip(
-        avatar: Icon(icon, size: 18),
-        label: Text(label),
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.orange.shade300),
+    return Scaffold(
+      backgroundColor: RetroColors.paper,
+      appBar: AppBar(
+        title: const Text(
+          'Рецепты',
+          style: TextStyle(
+            fontFamily: 'Georgia',
+            fontWeight: FontWeight.bold,
+            fontSize: 26,
+            letterSpacing: 1.2,
+          ),
         ),
+        backgroundColor: RetroColors.cherryRed,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        centerTitle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+        ),
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(painter: _BackgroundPainter()),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: LayoutBuilder(builder: (context, constraints) {
+              return Wrap(
+                spacing: 16,
+                runSpacing: 24,
+                children: List.generate(demoRecipes.length, (index) {
+                  final recipe = demoRecipes[index];
+                  final isLarge = index % 3 == 0;
+                  final cardWidth = isLarge ? cardWidthLarge : cardWidthSmall;
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              RecipeDetailScreen(recipe: recipe),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: cardWidth,
+                      decoration: BoxDecoration(
+                        color: RetroColors.paper.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: RetroColors.cocoa.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(2, 2),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Padding(
+                              padding: const EdgeInsets.all(3),
+                              child: CustomPaint(
+                                painter: _DoubleBorderPainter(),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Icon(Icons.star,
+                                size: 10,
+                                color:
+                                    RetroColors.burntOrange.withOpacity(0.6)),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Icon(Icons.star,
+                                size: 10,
+                                color: RetroColors.avocado.withOpacity(0.6)),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    topRight: Radius.circular(12)),
+                                child: Image.network(
+                                  recipe.imageUrl,
+                                  width: double.infinity,
+                                  height: isLarge ? 180 : 120,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: double.infinity,
+                                    height: isLarge ? 180 : 120,
+                                    color: RetroColors.mustard.withOpacity(0.3),
+                                    child: const Icon(Icons.restaurant_menu),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      recipe.title,
+                                      style: const TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: RetroColors.cocoa,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _InfoBadge(
+                                            icon: Icons.kitchen,
+                                            text:
+                                                '${recipe.ingredients.length} ингредиентов',
+                                            color: RetroColors.mustard
+                                                .withOpacity(0.2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: _InfoBadge(
+                                            icon: Icons.timer,
+                                            text:
+                                                '${recipe.steps.length * 5} мин',
+                                            color: RetroColors.avocado
+                                                .withOpacity(0.2),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: LinearProgressIndicator(
+                                        value: 0.7,
+                                        minHeight: 6,
+                                        backgroundColor: RetroColors.mustard
+                                            .withOpacity(0.3),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                RetroColors.mustard),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Icon(
+                              Icons.favorite_border,
+                              color: RetroColors.burntOrange,
+                              size: 26,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }
 }
 
-class RecipeCard extends StatelessWidget {
-  final Recipe recipe;
+class _InfoBadge extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
 
-  const RecipeCard({super.key, required this.recipe});
+  const _InfoBadge(
+      {required this.icon, required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(8.0),
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RecipeDetailScreen(recipe: recipe),
+      child: Row(
+        children: [
+          Icon(icon, size: 12, color: RetroColors.cocoa),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 10,
+                color: RetroColors.cocoa.withOpacity(0.8),
+                fontStyle: FontStyle.italic,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(15),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              // Изображение рецепта
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: Colors.grey.shade200,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    recipe.imageUrl,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey.shade300,
-                        child: Icon(
-                          Icons.restaurant_menu,
-                          size: 40,
-                          color: Colors.grey.shade500,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Информация о рецепте
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      recipe.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.list, size: 16, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${recipe.ingredients.length} ингр.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(Icons.timer, size: 16, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${recipe.steps.length * 5} мин',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: 0.7,
-                      backgroundColor: Colors.grey.shade200,
-                      color: Colors.orange,
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.favorite_border,
-                  color: Colors.grey.shade400,
-                ),
-                onPressed: () {},
-              ),
-            ],
           ),
-        ),
+        ],
       ),
     );
   }
+}
+
+class _DoubleBorderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final outerRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final outerPaint = Paint()
+      ..color = RetroColors.mustard.withOpacity(0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawRect(outerRect, outerPaint);
+
+    final innerRect = Rect.fromLTWH(6, 6, size.width - 12, size.height - 12);
+    final dashPaint = Paint()
+      ..color = RetroColors.avocado.withOpacity(0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    const dashWidth = 5.0;
+    const dashSpace = 3.0;
+
+    void drawDashedLine(Offset start, Offset end) {
+      final dx = end.dx - start.dx;
+      final dy = end.dy - start.dy;
+      final length = sqrt(dx * dx + dy * dy);
+      final dashCount = (length / (dashWidth + dashSpace)).floor();
+      final xStep = dx / dashCount;
+      final yStep = dy / dashCount;
+
+      for (int i = 0; i < dashCount; i += 2) {
+        final x1 = start.dx + i * xStep;
+        final y1 = start.dy + i * yStep;
+        final x2 = start.dx + (i + 1).clamp(0, dashCount) * xStep;
+        final y2 = start.dy + (i + 1).clamp(0, dashCount) * yStep;
+        canvas.drawLine(Offset(x1, y1), Offset(x2, y2), dashPaint);
+      }
+    }
+
+    drawDashedLine(innerRect.topLeft, innerRect.topRight);
+    drawDashedLine(innerRect.topRight, innerRect.bottomRight);
+    drawDashedLine(innerRect.bottomRight, innerRect.bottomLeft);
+    drawDashedLine(innerRect.bottomLeft, innerRect.topLeft);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _BackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+
+    paint.color = RetroColors.mustard.withOpacity(0.1);
+    canvas.drawCircle(Offset(60, 80), 60, paint);
+
+    paint.color = RetroColors.avocado.withOpacity(0.08);
+    canvas.drawOval(
+        Rect.fromLTWH(size.width - 120, size.height - 150, 120, 80), paint);
+
+    paint.color = RetroColors.burntOrange.withOpacity(0.08);
+    canvas.drawCircle(Offset(size.width / 2, 200), 50, paint);
+
+    paint.color = RetroColors.burntOrange.withOpacity(0.15);
+    paint.strokeWidth = 2;
+    canvas.drawLine(Offset(0, 0), Offset(size.width, size.height), paint);
+    canvas.drawLine(Offset(size.width, 0), Offset(0, size.height), paint);
+
+    paint.color = RetroColors.cocoa.withOpacity(0.02);
+    for (int i = 0; i < 200; i++) {
+      final dx = (size.width * (i % 20) / 20) + (i % 5);
+      final dy = (size.height * (i ~/ 20) / 10) + (i % 5);
+      canvas.drawCircle(Offset(dx, dy), 1, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
