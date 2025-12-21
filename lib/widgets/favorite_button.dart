@@ -29,7 +29,7 @@ class _FavoriteButtonState extends State<FavoriteButton> {
     super.initState();
     _checkFavoriteStatus();
   }
-
+  
   Future<void> _checkFavoriteStatus() async {
     try {
       final isFav = await ApiService.isFavorite(widget.recipeId);

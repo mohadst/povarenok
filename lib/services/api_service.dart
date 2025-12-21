@@ -3,10 +3,81 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.121.177:3000/api';
+  // static const String baseUrl = 'http://192.168.121.177:3000/api';
+  static const String baseUrl = 'http://localhost:3000/api';
+  // static const String baseUrl = 'http://localhost:8080/api';
   // Для отладки - показывать все запросы
   static bool debugMode = true;
 
+  // ============ ТЕСТОВАЯ ФУНКЦИЯ ============
+  
+// ============ ТЕСТОВАЯ ФУНКЦИЯ ============
+
+static Future<void> testConnection() async {
+  print('🔍 Тестируем подключение к серверу...');
+  print('====================================');
+  
+  // ОБНОВИЛ - теперь тестируем порт 8080
+  List<String> testUrls = [
+    'http://localhost:8080',  // 8080 вместо 3000
+    'http://127.0.0.1:8080',  // 8080 вместо 3000
+    'http://192.168.121.177:8080',  // 8080 вместо 3000
+  ];
+  
+  for (var url in testUrls) {
+    try {
+      print('📡 Пробуем подключиться к: $url/health');
+      
+      // GET запрос для проверки
+      final response = await http.get(
+        Uri.parse('$url/health'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(Duration(seconds: 3));
+      
+      print('✅ Успешное подключение!');
+      print('📊 Статус: ${response.statusCode}');
+      print('📄 Ответ: ${response.body}');
+      
+      // Тест POST запроса
+      print('\n📤 Тестируем POST запрос...');
+      try {
+        final postResponse = await http.post(
+          Uri.parse('$url/api/auth/login'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: jsonEncode({
+            'phone_number': '+72222222222',
+            'password': 'password123'
+          }),
+        ).timeout(Duration(seconds: 5));
+        
+        print('📤 POST статус: ${postResponse.statusCode}');
+        print('📤 POST ответ: ${postResponse.body}');
+      } catch (postError) {
+        print('❌ POST тест не удался: $postError');
+      }
+      
+      print('====================================\n');
+      
+      return;
+      
+    } catch (e) {
+      print('❌ Ошибка для $url: $e');
+      print('---');
+    }
+  }
+  
+  print('⚠️ ⚠️ ⚠️ НИ ОДИН АДРЕС НЕ РАБОТАЕТ ⚠️ ⚠️ ⚠️');
+  print('Проверь:');
+  print('1. Сервер запущен? (npm start в терминале)');
+  print('2. Адрес правильный? (попробуй http://localhost:8080/health в браузере)');  // 8080!
+  print('3. Брандмауэр не блокирует?');
+  print('====================================\n');
+}
+  // ============ СТАРЫЙ КОД (без изменений) ============
+  
   // Получить сохраненный токен
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -223,62 +294,59 @@ class ApiService {
   // ============ FAVORITES ============
 
   // Получить избранные рецепты
-// В ApiService.dart обновите метод getFavorites:
-static Future<List<dynamic>> getFavorites() async {
-  try {
-    if (debugMode) print('⭐ Запрос избранных рецептов...');
-    final headers = await _getHeaders();
-    
-    // Добавьте отладку заголовков
-    final token = await getToken();
-    if (debugMode) {
-      print('Токен: ${token != null ? "ЕСТЬ (${token.length} символов)" : "ОТСУТСТВУЕТ"}');
-      print('Заголовки: $headers');
-    }
-    
-    final response = await http.get(
-      Uri.parse('$baseUrl/favorites'),
-      headers: headers,
-    );
+  static Future<List<dynamic>> getFavorites() async {
+    try {
+      if (debugMode) print('⭐ Запрос избранных рецептов...');
+      final headers = await _getHeaders();
+      
+      final token = await getToken();
+      if (debugMode) {
+        print('Токен: ${token != null ? "ЕСТЬ (${token.length} символов)" : "ОТСУТСТВУЕТ"}');
+        print('Заголовки: $headers');
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/favorites'),
+        headers: headers,
+      );
 
-    if (debugMode) {
-      print('📥 Ответ избранных:');
-      print('  Статус: ${response.statusCode}');
-      print('  Тело: ${response.body}'); // Показываем полное тело для 500 ошибки
+      if (debugMode) {
+        print('📥 Ответ избранных:');
+        print('  Статус: ${response.statusCode}');
+        print('  Тело: ${response.body}');
+      }
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = response.body;
+        if (debugMode) print('Полный текст ошибки: $errorBody');
+        throw Exception('Ошибка загрузки избранного: ${response.statusCode}. $errorBody');
+      }
+    } catch (e) {
+      if (debugMode) print('❌ Исключение в getFavorites(): $e');
+      throw Exception('Network error: $e');
     }
-    
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      // Для 500 ошибки попробуем получить больше информации
-      final errorBody = response.body;
-      if (debugMode) print('Полный текст ошибки: $errorBody');
-      throw Exception('Ошибка загрузки избранного: ${response.statusCode}. $errorBody');
-    }
-  } catch (e) {
-    if (debugMode) print('❌ Исключение в getFavorites(): $e');
-    throw Exception('Network error: $e');
   }
-}
 
-  // Добавьте в ApiService:
-static Future<Map<String, dynamic>> testFavoritesEndpoint() async {
-  try {
-    final headers = await _getHeaders();
-    final response = await http.get(
-      Uri.parse('$baseUrl/favorites'),
-      headers: headers,
-    );
-    
-    return {
-      'status': response.statusCode,
-      'body': response.body,
-      'headers': response.headers,
-    };
-  } catch (e) {
-    return {'error': e.toString()};
+  static Future<Map<String, dynamic>> testFavoritesEndpoint() async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/favorites'),
+        headers: headers,
+      );
+      
+      return {
+        'status': response.statusCode,
+        'body': response.body,
+        'headers': response.headers,
+      };
+    } catch (e) {
+      return {'error': e.toString()};
+    }
   }
-}
+
   // Добавить в избранное
   static Future<bool> addToFavorites(int recipeId) async {
     try {
@@ -329,42 +397,38 @@ static Future<Map<String, dynamic>> testFavoritesEndpoint() async {
     }
   }
 
-// В файле api_service.dart ДОБАВЬТЕ метод для диагностики:
-static Future<Map<String, dynamic>> diagnoseFavoritesError() async {
-  try {
-    print('🔍 Диагностика ошибки избранного...');
-    
-    // 1. Проверка токена
-    final token = await getToken();
-    print('Токен: ${token != null ? "ЕСТЬ (${token.length} символов)" : "НЕТ"}');
-    
-    if (token == null) {
-      return {'error': 'Token missing', 'solution': 'User needs to login again'};
+  static Future<Map<String, dynamic>> diagnoseFavoritesError() async {
+    try {
+      print('🔍 Диагностика ошибки избранного...');
+      
+      final token = await getToken();
+      print('Токен: ${token != null ? "ЕСТЬ (${token.length} символов)" : "НЕТ"}');
+      
+      if (token == null) {
+        return {'error': 'Token missing', 'solution': 'User needs to login again'};
+      }
+      
+      print('Проверка эндпоинта: $baseUrl/favorites');
+      
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/favorites'),
+        headers: headers,
+      );
+      
+      print('Ответ сервера: ${response.statusCode}');
+      print('Тело ответа: ${response.body}');
+      
+      return {
+        'status': response.statusCode,
+        'body': response.body,
+        'error': response.statusCode != 200 ? 'Server error' : null
+      };
+    } catch (e) {
+      print('Ошибка диагностики: $e');
+      return {'error': e.toString()};
     }
-    
-    // 2. Проверка эндпоинта
-    print('Проверка эндпоинта: $baseUrl/favorites');
-    
-    // 3. Отправка тестового запроса
-    final headers = await _getHeaders();
-    final response = await http.get(
-      Uri.parse('$baseUrl/favorites'),
-      headers: headers,
-    );
-    
-    print('Ответ сервера: ${response.statusCode}');
-    print('Тело ответа: ${response.body}');
-    
-    return {
-      'status': response.statusCode,
-      'body': response.body,
-      'error': response.statusCode != 200 ? 'Server error' : null
-    };
-  } catch (e) {
-    print('Ошибка диагностики: $e');
-    return {'error': e.toString()};
   }
-}
 
   // ============ PREFERENCES ============
 

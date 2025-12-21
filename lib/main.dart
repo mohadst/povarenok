@@ -25,7 +25,10 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+    ApiService.testConnection();
     _checkLoginStatus();
+  });
   }
 
   Future<void> _checkLoginStatus() async {

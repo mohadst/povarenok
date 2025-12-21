@@ -15,7 +15,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   String? _error;
   final FlutterTts _tts = FlutterTts();
 
-  @override
+  @override     
   void initState() {
     super.initState();
     _loadFavorites();
