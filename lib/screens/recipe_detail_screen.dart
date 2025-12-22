@@ -30,8 +30,34 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   }
 
   Future<void> _initializeServices() async {
+    print('Инициализация сервисов...');
+
     await TtsService.init();
-    await SpeechService.initialize();
+
+    bool speechInitialized = await SpeechService.initialize();
+
+    if (speechInitialized) {
+      print('SpeechToText успешно инициализирован');
+
+      final languages = await SpeechService.getAvailableLanguages();
+      print('Доступные языки:');
+      for (var lang in languages) {
+        print('  - ${lang.localeId}: ${lang.name}');
+      }
+    } else {
+      print('SpeechToText не инициализирован');
+      print('Ошибка: ${SpeechService.lastError}');
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Не удалось инициализировать распознавание речи. '
+                'Проверьте разрешения на микрофон.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      });
+    }
   }
 
   void _openTimer() {
@@ -48,12 +74,24 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
     );
   }
 
-  void _speakCurrentStep() {
+  void _speakCurrentStep() async {
     final currentStep = widget.recipe.steps[_currentStepIndex];
-    TtsService.speak(currentStep.instruction).then((_) {
-      if (_autoContinue) _startListeningForContinue();
-    });
+    print('[RecipeDetail] Озвучиваю шаг: ${currentStep.instruction}');
+
     setState(() => _isSpeaking = true);
+
+    await TtsService.speak(currentStep.instruction);
+
+    print('[RecipeDetail] Озвучка завершена');
+
+    // Если включено авто-продолжение, ждем немного и начинаем слушать
+    if (_autoContinue && mounted) {
+      print('[RecipeDetail] Авто-продолжение включено, жду 1 секунду...');
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted && _autoContinue) {
+        _startListeningForContinue();
+      }
+    }
   }
 
   void _stopSpeaking() {
@@ -67,28 +105,53 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   }
 
   void _startListeningForContinue() {
+    print('[RecipeDetail] Запускаю прослушивание для продолжения');
+
     setState(() {
       _isListening = true;
       _recognizedText = 'Слушаю...';
     });
 
     SpeechService.startListening((text) {
+      print('[RecipeDetail] Получен текст: "$text"');
+
       setState(() {
         _recognizedText = text;
         _isListening = false;
       });
 
-      if (text.contains('продолжить') ||
-          text.contains('дальше') ||
-          text.contains('next')) {
+      // Простая и надежная обработка команд
+      final lowerText = text.toLowerCase();
+
+      print('[RecipeDetail] Обрабатываю команду: "$lowerText"');
+
+      if (lowerText.contains('дальше') ||
+          lowerText.contains('продолжить') ||
+          lowerText.contains('следующий') ||
+          lowerText.contains('next') ||
+          lowerText.contains('continue')) {
+        print('[RecipeDetail] Команда: ДАЛЬШЕ');
         _nextStep();
-      } else if (text.contains('повторить') || text.contains('repeat')) {
+      } else if (lowerText.contains('повторить') ||
+          lowerText.contains('еще раз') ||
+          lowerText.contains('repeat') ||
+          lowerText.contains('again')) {
+        print('[RecipeDetail] Команда: ПОВТОРИТЬ');
         _speakCurrentStep();
-      } else if (text.contains('назад') || text.contains('back')) {
+      } else if (lowerText.contains('назад') ||
+          lowerText.contains('предыдущий') ||
+          lowerText.contains('back') ||
+          lowerText.contains('previous')) {
+        print('[RecipeDetail] Команда: НАЗАД');
         _previousStep();
-      } else if (text.contains('стоп') || text.contains('stop')) {
+      } else if (lowerText.contains('стоп') ||
+          lowerText.contains('остановить') ||
+          lowerText.contains('хватит') ||
+          lowerText.contains('stop')) {
+        print('[RecipeDetail] Команда: СТОП');
         _stopSpeaking();
       } else {
+        print('[RecipeDetail] Неизвестная команда, повторяю шаг');
         _speakCurrentStep();
       }
     });
@@ -328,7 +391,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                   const SizedBox(height: 12),
                   Text(
                     _autoContinue
-                        ? '✓ Авто-продолжение включено'
+                        ? 'Авто-продолжение включено'
                         : 'Нажмите микрофон сверху для включения авто-продолжения',
                     style: TextStyle(
                         fontSize: 14,
@@ -384,6 +447,69 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                 elevation: 6,
               ),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () async {
+                print('Тест микрофона...');
+
+                // Упрощенная проверка
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Проверка микрофона'),
+                    content: const Text(
+                        'Для проверки микрофона нажмите "Озвучить шаг" и разрешите доступ к микрофону если запросится'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              icon: const Icon(Icons.mic_external_on),
+              label: const Text('Проверить микрофон'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue,
+                side: const BorderSide(color: Colors.blue),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Тестовая кнопка для отладки
+                      print('=== ТЕСТ РАСПОЗНАВАНИЯ ===');
+                      _startListeningForContinue();
+                    },
+                    icon: const Icon(Icons.mic_none),
+                    label: const Text('Тест микрофона'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      print('=== ТЕСТ TTS ===');
+                      _speakCurrentStep();
+                    },
+                    icon: const Icon(Icons.volume_up),
+                    label: const Text('Тест озвучки'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -420,7 +546,6 @@ class _StepBackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = RetroColors.cocoa.withOpacity(0.03);
 
-    // точкииравмпава потомдле
     for (int i = 0; i < 300; i++) {
       final dx = (size.width * (i % 20) / 20) + (i % 5);
       final dy = (size.height * (i ~/ 20) / 10) + (i % 5);

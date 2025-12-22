@@ -12,7 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
-  speech_to_text: ^6.6.0
+  speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0  # Обновленная версия
   http: ^0.13.6
   flutter_dotenv: ^5.0.2
