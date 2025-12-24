@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cooking_postgres
+    environment:
+      POSTGRES_DB: cooking_assistant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  api:
+    build: .
+    container_name: cooking_api
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: cooking_assistant
+      DB_USER: postgres
+      DB_PASSWORD: 12345
+      JWT_SECRET: your_super_secret_key
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:

@@ -1,12 +1,14 @@
-import 'dart:async'; // Добавьте этот импорт для Timer
 import 'package:flutter/material.dart';
-import '../data/recipes.dart';
+import '../data/recipes_data.dart';
+import '../theme/retro_colors.dart';
 import '../services/tts_service.dart';
 import '../services/speech_service.dart';
+import '../widgets/retro_card.dart';
+import '../screens/timer_screen.dart';
+import '../services/timer_manager.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Recipe recipe;
-
   const RecipeDetailScreen({super.key, required this.recipe});
 
   @override
@@ -18,9 +20,8 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   bool _isSpeaking = false;
   bool _isFavorite = false;
   bool _isListening = false;
-  String _recognizedText = '';
   bool _autoContinue = false;
-  Timer? _speechCheckTimer;
+  String _recognizedText = '';
 
   @override
   void initState() {
@@ -29,128 +30,128 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   }
 
   Future<void> _initializeServices() async {
-    await TtsService.init();
-    await SpeechService.initialize();
-  }
+    print('Инициализация сервисов...');
 
-  void _onSpeechComplete() {
-    if (_autoContinue && mounted) {
-      setState(() {
-        _isSpeaking = false;
-      });
-      _startListeningForContinue();
+    await TtsService.init();
+
+    bool speechInitialized = await SpeechService.initialize();
+
+    if (speechInitialized) {
+      print('SpeechToText успешно инициализирован');
+
+      final languages = await SpeechService.getAvailableLanguages();
+      print('Доступные языки:');
+      for (var lang in languages) {
+        print('  - ${lang.localeId}: ${lang.name}');
+      }
     } else {
-      setState(() {
-        _isSpeaking = false;
+      print('SpeechToText не инициализирован');
+      print('Ошибка: ${SpeechService.lastError}');
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Не удалось инициализировать распознавание речи. '
+                'Проверьте разрешения на микрофон.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       });
     }
   }
 
-  Future<void> _speakCurrentStep() async {
-    if (_currentStepIndex >= widget.recipe.steps.length) return;
-    
+  void _openTimer() {
+    final timerManager = TimerManager();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TimerScreen(
+          title: widget.recipe.title,
+          timerManager: timerManager,
+        ),
+      ),
+    );
+  }
+
+  void _speakCurrentStep() async {
     final currentStep = widget.recipe.steps[_currentStepIndex];
-    
-    setState(() {
-      _isSpeaking = true;
-      _isListening = false;
-    });
-    
-    await TtsService.stop();
-    await SpeechService.stopListening();
-    
-    // Ждем немного перед началом речи
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    await TtsService.speak(currentStep.instruction, onComplete: _onSpeechComplete);
-  }
+    print('[RecipeDetail] Озвучиваю шаг: ${currentStep.instruction}');
 
-  void _startListeningForContinue() {
-    setState(() {
-      _isListening = true;
-      _recognizedText = 'Слушаю команду...';
-    });
+    setState(() => _isSpeaking = true);
 
-    SpeechService.startListening((text) {
-      _processVoiceCommand(text);
-    });
-  }
+    await TtsService.speak(currentStep.instruction);
 
-  void _processVoiceCommand(String text) {
-    if (!mounted) return;
-    
-    setState(() {
-      _recognizedText = text;
-      _isListening = false;
-    });
+    print('[RecipeDetail] Озвучка завершена');
 
-    // Очищаем текст через 3 секунды
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _recognizedText = '';
-        });
-      }
-    });
-
-    // Проверяем команды (более гибкое распознавание)
-    final lowerText = text.toLowerCase();
-    
-    if (lowerText.contains('продолжи') || 
-        lowerText.contains('дальше') || 
-        lowerText.contains('следующий') ||
-        lowerText.contains('next') ||
-        lowerText.contains('вперёд') ||
-        lowerText.contains('вперед')) {
-      _nextStep();
-    } else if (lowerText.contains('повтори') || 
-              lowerText.contains('еще раз') ||
-              lowerText.contains('ещё раз') ||
-              lowerText.contains('repeat') ||
-              lowerText.contains('заново')) {
-      _repeatStep();
-    } else if (lowerText.contains('предыдущий') || 
-              lowerText.contains('назад') ||
-              lowerText.contains('back') ||
-              lowerText.contains('вернись')) {
-      _previousStep();
-    } else if (lowerText.contains('стоп') || 
-              lowerText.contains('останови') ||
-              lowerText.contains('stop') ||
-              lowerText.contains('хватит')) {
-      _stopAll();
-    } else if (lowerText.contains('старт') ||
-              lowerText.contains('начать') ||
-              lowerText.contains('start')) {
-      _speakCurrentStep();
-    } else if (lowerText.contains('первый шаг') ||
-              lowerText.contains('сначала')) {
-      _goToFirstStep();
-    } else if (lowerText.contains('сколько шагов') ||
-              lowerText.contains('сколько осталось')) {
-      _speakStepsInfo();
-    } else if (lowerText.contains('что сейчас') ||
-              lowerText.contains('текущий шаг')) {
-      _speakCurrentStep();
-    } else {
-      // Если команда не распознана, ждем новую команду
-      if (_autoContinue) {
+    if (_autoContinue && mounted) {
+      print('[RecipeDetail] Авто-продолжение включено, жду 1 секунду...');
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted && _autoContinue) {
         _startListeningForContinue();
       }
     }
   }
 
-  void _repeatStep() {
+  void _stopSpeaking() {
+    TtsService.stop();
+    SpeechService.stopListening();
     setState(() {
       _isSpeaking = false;
       _isListening = false;
+      _autoContinue = false;
     });
-    
-    TtsService.stop();
-    SpeechService.stopListening();
-    
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _speakCurrentStep();
+  }
+
+  void _startListeningForContinue() {
+    print('[RecipeDetail] Запускаю прослушивание для продолжения');
+
+    setState(() {
+      _isListening = true;
+      _recognizedText = 'Слушаю...';
+    });
+
+    SpeechService.startListening((text) {
+      print('[RecipeDetail] Получен текст: "$text"');
+
+      setState(() {
+        _recognizedText = text;
+        _isListening = false;
+      });
+
+      final lowerText = text.toLowerCase();
+
+      print('[RecipeDetail] Обрабатываю команду: "$lowerText"');
+
+      if (lowerText.contains('дальше') ||
+          lowerText.contains('продолжить') ||
+          lowerText.contains('следующий') ||
+          lowerText.contains('next') ||
+          lowerText.contains('continue')) {
+        print('[RecipeDetail] Команда: ДАЛЬШЕ');
+        _nextStep();
+      } else if (lowerText.contains('повторить') ||
+          lowerText.contains('еще раз') ||
+          lowerText.contains('repeat') ||
+          lowerText.contains('again')) {
+        print('[RecipeDetail] Команда: ПОВТОРИТЬ');
+        _speakCurrentStep();
+      } else if (lowerText.contains('назад') ||
+          lowerText.contains('предыдущий') ||
+          lowerText.contains('back') ||
+          lowerText.contains('previous')) {
+        print('[RecipeDetail] Команда: НАЗАД');
+        _previousStep();
+      } else if (lowerText.contains('стоп') ||
+          lowerText.contains('остановить') ||
+          lowerText.contains('хватит') ||
+          lowerText.contains('stop')) {
+        print('[RecipeDetail] Команда: СТОП');
+        _stopSpeaking();
+      } else {
+        print('[RecipeDetail] Неизвестная команда, повторяю шаг');
+        _speakCurrentStep();
+      }
     });
   }
 
@@ -161,15 +162,15 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
         _isSpeaking = false;
         _isListening = false;
       });
-      
-      TtsService.stop();
-      SpeechService.stopListening();
-      
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _speakCurrentStep();
-      });
+      Future.delayed(
+          const Duration(milliseconds: 500), () => _speakCurrentStep());
     } else {
-      _completeRecipe();
+      TtsService.speak('Рецепт завершен! Приятного аппетита!');
+      setState(() {
+        _isSpeaking = false;
+        _isListening = false;
+        _autoContinue = false;
+      });
     }
   }
 
@@ -180,555 +181,451 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
         _isSpeaking = false;
         _isListening = false;
       });
-      
-      TtsService.stop();
-      SpeechService.stopListening();
-      
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _speakCurrentStep();
-      });
-    } else {
-      TtsService.speak('Это первый шаг', onComplete: () {
-        if (_autoContinue) {
-          _startListeningForContinue();
-        }
-      });
+      Future.delayed(
+          const Duration(milliseconds: 500), () => _speakCurrentStep());
     }
-  }
-
-  void _goToFirstStep() {
-    setState(() {
-      _currentStepIndex = 0;
-      _isSpeaking = false;
-      _isListening = false;
-    });
-    
-    TtsService.stop();
-    SpeechService.stopListening();
-    
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _speakCurrentStep();
-    });
-  }
-
-  void _speakStepsInfo() {
-    final remaining = widget.recipe.steps.length - (_currentStepIndex + 1);
-    final message = remaining == 0 
-        ? 'Это последний шаг'
-        : 'Осталось $remaining ${_getStepsWord(remaining)}';
-    
-    TtsService.speak(message, onComplete: () {
-      if (_autoContinue) {
-        _startListeningForContinue();
-      }
-    });
-  }
-
-  String _getStepsWord(int count) {
-    if (count % 10 == 1 && count % 100 != 11) return 'шаг';
-    if (count % 10 >= 2 && count % 10 <= 4 && 
-        (count % 100 < 10 || count % 100 >= 20)) return 'шага';
-    return 'шагов';
-  }
-
-  void _completeRecipe() {
-    setState(() {
-      _isSpeaking = false;
-      _isListening = false;
-      _autoContinue = false;
-    });
-    
-    TtsService.stop();
-    SpeechService.stopListening();
-    
-    TtsService.speak('Рецепт завершён! Приятного аппетита!');
-    
-    // Показываем сообщение о завершении
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Рецепт завершён!'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-        action: SnackBarAction(
-          label: 'OK',
-          onPressed: () {},
-          textColor: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  void _stopAll() {
-    setState(() {
-      _isSpeaking = false;
-      _isListening = false;
-      _autoContinue = false;
-    });
-    
-    TtsService.stop();
-    SpeechService.stopListening();
   }
 
   void _toggleAutoContinue() {
-    setState(() {
-      _autoContinue = !_autoContinue;
-    });
-    
-    if (_autoContinue) {
-      // Если включаем авто-продолжение и сейчас не говорим, начинаем
-      if (!_isSpeaking) {
-        _speakCurrentStep();
-      }
-    } else {
-      // Если выключаем, останавливаем прослушивание
-      SpeechService.stopListening();
-      setState(() {
-        _isListening = false;
-      });
-    }
+    setState(() => _autoContinue = !_autoContinue);
+    if (_autoContinue && !_isSpeaking) _speakCurrentStep();
+  }
+
+  @override
+  void dispose() {
+    TtsService.stop();
+    SpeechService.stopListening();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentStep = _currentStepIndex < widget.recipe.steps.length
-        ? widget.recipe.steps[_currentStepIndex]
-        : RecipeStep(number: 0, instruction: 'Рецепт завершён');
+    final currentStep = widget.recipe.steps[_currentStepIndex];
+    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
+      backgroundColor: RetroColors.paper,
       appBar: AppBar(
-        title: Text(widget.recipe.title),
-        backgroundColor: Colors.orange,
+        title: Text(widget.recipe.title,
+            style: const TextStyle(fontFamily: 'Georgia')),
+        backgroundColor: RetroColors.cherryRed,
         foregroundColor: Colors.white,
         actions: [
-          // Переключатель авто-продолжения
           IconButton(
-            icon: Icon(
-              _autoContinue ? Icons.mic : Icons.mic_off,
-              color: _autoContinue ? Colors.green : Colors.white,
-            ),
+            icon: Icon(_autoContinue ? Icons.mic : Icons.mic_off,
+                color: _autoContinue ? Colors.greenAccent : Colors.white),
             onPressed: _toggleAutoContinue,
-            tooltip: _autoContinue 
-              ? 'Авто-продолжение включено. Скажите "продолжить" для следующего шага'
-              : 'Включить авто-продолжение',
           ),
           IconButton(
             icon: Icon(
               _isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorite ? Colors.red : Colors.white,
+              color: _isFavorite ? RetroColors.burntOrange : Colors.white,
             ),
-            onPressed: () {
-              setState(() {
-                _isFavorite = !_isFavorite;
-              });
-            },
+            onPressed: () => setState(() => _isFavorite = !_isFavorite),
           ),
+          IconButton(
+            icon: const Icon(Icons.timer),
+            tooltip: 'Таймер',
+            onPressed: _openTimer,
+          ),
+          if (_isSpeaking)
+            IconButton(
+              icon: const Icon(Icons.stop),
+              onPressed: _stopSpeaking,
+            ),
         ],
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Изображение рецепта
-            Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
-                ),
-                child: Image.network(
-                  widget.recipe.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey.shade300,
-                      child: const Icon(
-                        Icons.restaurant_menu,
-                        size: 60,
-                        color: Colors.grey,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 220,
+                    child: Image.network(
+                      widget.recipe.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: RetroColors.mustard.withOpacity(0.3),
+                        child: const Center(
+                          child: Icon(Icons.restaurant_menu,
+                              size: 50, color: Colors.white),
+                        ),
                       ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 20,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            RetroColors.mustard.withOpacity(0.3),
+                            Colors.transparent
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 20,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            RetroColors.avocado.withOpacity(0.3),
+                            Colors.transparent
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ...List.generate(6, (i) {
+                    final top = (i * 40.0) % 200 + 10;
+                    final left = (i * 50.0) % 300 + 10;
+                    return Positioned(
+                      top: top,
+                      left: left,
+                      child: Icon(Icons.star,
+                          size: 12, color: Colors.white.withOpacity(0.5)),
                     );
-                  },
-                ),
+                  }),
+                ],
               ),
             ),
+            const SizedBox(height: 16),
 
-            // Информация о рецепте
-            Padding(
-              padding: const EdgeInsets.all(16.0),
+            RetroCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.recipe.title,
-                    style: const TextStyle(
-                      fontSize: 24,
+                  const Text(
+                    'Ингредиенты',
+                    style: TextStyle(
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.list, size: 16, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${widget.recipe.ingredients.length} ингредиентов',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(Icons.timer, size: 16, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${widget.recipe.steps.length} шагов',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Прогресс-бар
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: LinearProgressIndicator(
-                value: (_currentStepIndex + 1) / widget.recipe.steps.length,
-                backgroundColor: Colors.grey.shade200,
-                color: Colors.orange,
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Шаг ${_currentStepIndex + 1} из ${widget.recipe.steps.length}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '${((_currentStepIndex + 1) / widget.recipe.steps.length * 100).round()}%',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
-
-            // Текущий шаг
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                color: Colors.orange.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 16,
-                                backgroundColor: Colors.orange,
-                                child: Text(
-                                  '${_currentStepIndex + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Текущий шаг',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_isSpeaking)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.green.shade200),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.volume_up, size: 16, color: Colors.green.shade800),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Говорит',
-                                    style: TextStyle(
-                                      color: Colors.green.shade800,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (_isListening)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.blue.shade200),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.mic, size: 16, color: Colors.blue.shade800),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Слушает',
-                                    style: TextStyle(
-                                      color: Colors.blue.shade800,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        currentStep.instruction,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.6,
-                        ),
-                      ),
-                      if (_recognizedText.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.blue.shade100),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.mic, size: 16, color: Colors.blue.shade700),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Распознано: "$_recognizedText"',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.blue.shade800,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Голосовые команды
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.mic, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Text(
-                            'Голосовые команды',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Скажите одну из команд после звукового сигнала:',
+                  const SizedBox(height: 12),
+                  if (widget.recipe.ingredients.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        'Ингредиенты не указаны',
                         style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildVoiceCommandChip('Продолжить / Дальше'),
-                          _buildVoiceCommandChip('Повторить'),
-                          _buildVoiceCommandChip('Предыдущий шаг'),
-                          _buildVoiceCommandChip('Стоп'),
-                          _buildVoiceCommandChip('Начать сначала'),
-                          _buildVoiceCommandChip('Сколько осталось'),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: _autoContinue ? Colors.green.shade50 : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _autoContinue ? Colors.green.shade200 : Colors.grey.shade300,
-                          ),
-                        ),
+                    )
+                  else
+                    ...widget.recipe.ingredients.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final ingredient = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              _autoContinue ? Icons.check_circle : Icons.info,
-                              color: _autoContinue ? Colors.green : Colors.grey,
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: RetroColors.avocado.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: RetroColors.avocado,
+                                  ),
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                _autoContinue 
-                                  ? '✓ Авто-продолжение включено. После каждого шага скажите "Продолжить"'
-                                  : 'Нажмите на иконку микрофона вверху для включения авто-продолжения',
-                                style: TextStyle(
-                                  color: _autoContinue ? Colors.green.shade800 : Colors.grey.shade700,
-                                  fontSize: 14,
-                                ),
+                                ingredient,
+                                style: const TextStyle(fontSize: 16),
+                                softWrap: true,
                               ),
                             ),
                           ],
                         ),
+                      );
+                    }).toList(),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: RetroColors.burntOrange, width: 2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                      child: CustomPaint(painter: _StepBackgroundPainter())),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: RetroColors.mustard,
+                            child: Text('${_currentStepIndex + 1}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text('Шаг',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          if (_isSpeaking)
+                            _statusBadge('Говорит...', RetroColors.mustard),
+                          if (_isListening)
+                            _statusBadge('Слушает...', Colors.blue.shade400),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(currentStep.instruction,
+                          style: const TextStyle(fontSize: 16, height: 1.5)),
+                      if (_recognizedText.isNotEmpty && _isListening)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text('Распознано: "$_recognizedText"',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.blue.shade700,
+                                  fontStyle: FontStyle.italic)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            RetroCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.mic, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Голосовые команды',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _voiceChip('Продолжить / Дальше'),
+                      _voiceChip('Повторить'),
+                      _voiceChip('Предыдущий'),
+                      _voiceChip('Стоп'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _autoContinue
+                        ? 'Авто-продолжение включено'
+                        : 'Нажмите микрофон сверху для включения авто-продолжения',
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: _autoContinue ? Colors.green : Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _previousStep,
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Назад'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      side:
+                          BorderSide(color: RetroColors.cocoa.withOpacity(0.5)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _nextStep,
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('Вперед'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      side:
+                          BorderSide(color: RetroColors.cocoa.withOpacity(0.5)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _isSpeaking ? _stopSpeaking : _speakCurrentStep,
+              icon: Icon(_isSpeaking ? Icons.stop : Icons.record_voice_over),
+              label: Text(_isSpeaking ? 'Остановить озвучку' : 'Озвучить шаг'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    _isSpeaking ? Colors.redAccent : RetroColors.mustard,
+                foregroundColor: RetroColors.cocoa,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () async {
+                print('Тест микрофона...');
+
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Проверка микрофона'),
+                    content: const Text(
+                        'Для проверки микрофона нажмите "Озвучить шаг" и разрешите доступ к микрофону если запросится'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
                       ),
                     ],
                   ),
-                ),
+                );
+              },
+              icon: const Icon(Icons.mic_external_on),
+              label: const Text('Проверить микрофон'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue,
+                side: const BorderSide(color: Colors.blue),
               ),
             ),
-
-            // Управление шагами
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _currentStepIndex > 0 ? _previousStep : null,
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('Назад'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _currentStepIndex < widget.recipe.steps.length - 1 ? _nextStep : null,
-                      icon: const Text('Вперед'),
-                      label: const Icon(Icons.arrow_forward),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Кнопки озвучивания
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                children: [
-                  // Основная кнопка озвучки
-                  ElevatedButton.icon(
-                    onPressed: _isSpeaking ? _stopAll : _speakCurrentStep,
-                    icon: Icon(_isSpeaking ? Icons.stop : Icons.record_voice_over),
-                    label: Text(_isSpeaking ? 'Остановить' : 'Озвучить этот шаг'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Тестовая кнопка для отладки
+                      print('=== ТЕСТ РАСПОЗНАВАНИЯ ===');
+                      _startListeningForContinue();
+                    },
+                    icon: const Icon(Icons.mic_none),
+                    label: const Text('Тест микрофона'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isSpeaking ? Colors.red : Colors.orange,
+                      backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  // Кнопка для тестирования голосового управления
-                  if (!_autoContinue)
-                    OutlinedButton.icon(
-                      onPressed: _startListeningForContinue,
-                      icon: Icon(_isListening ? Icons.mic_off : Icons.mic),
-                      label: Text(_isListening ? 'Остановить' : 'Сказать команду'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      print('=== ТЕСТ TTS ===');
+                      _speakCurrentStep();
+                    },
+                    icon: const Icon(Icons.volume_up),
+                    label: const Text('Тест озвучки'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
                     ),
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVoiceCommandChip(String command) {
-    return Chip(
-      label: Text(command),
-      backgroundColor: Colors.blue.shade50,
-      shape: RoundedRectangleBorder(
+  Widget _statusBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Colors.blue.shade200),
       ),
+      child: Text(text,
+          style: TextStyle(
+              color: color, fontSize: 12, fontWeight: FontWeight.bold)),
     );
   }
 
-  @override
-  void dispose() {
-    _speechCheckTimer?.cancel();
-    TtsService.stop();
-    SpeechService.stopListening();
-    super.dispose();
+  static Widget _voiceChip(String command) {
+    return Chip(
+      label: Text(command),
+      backgroundColor: RetroColors.paper,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: RetroColors.cocoa.withOpacity(0.3)),
+      ),
+    );
   }
+}
+
+class _StepBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = RetroColors.cocoa.withOpacity(0.03);
+
+    for (int i = 0; i < 300; i++) {
+      final dx = (size.width * (i % 20) / 20) + (i % 5);
+      final dy = (size.height * (i ~/ 20) / 10) + (i % 5);
+      canvas.drawCircle(Offset(dx, dy), 1, paint);
+    }
+
+    final linePaint = Paint()
+      ..color = RetroColors.avocado.withOpacity(0.05)
+      ..strokeWidth = 1;
+    for (double y = 0; y < size.height; y += 20) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/retro_colors.dart';
+import '../widgets/retro_card.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -6,121 +9,135 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: RetroColors.paper,
       appBar: AppBar(
-        title: const Text('Профиль'),
-        backgroundColor: Colors.orange,
+        title: const Text(
+          'Профиль',
+          style: TextStyle(
+            fontFamily: 'Georgia',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: RetroColors.cherryRed,
         foregroundColor: Colors.white,
+        centerTitle: true,
+        elevation: 4,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+        ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Заголовок профиля
-            Container(
-              color: Colors.orange[50],
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.orange[100],
-                    child: const Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Colors.orange,
-                    ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              RetroCard(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: RetroColors.mustard.withOpacity(0.1),
+                          border: Border.all(
+                            color: RetroColors.cocoa.withOpacity(0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Image.asset(
+                            'assets/cherry.png',
+                            height: 80,
+                            width: 80,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                Icons.restaurant,
+                                size: 60,
+                                color: RetroColors.cherryRed,
+                              );
+                            },
+                          ),
+                          
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Повар-любитель',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: RetroColors.cocoa,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Создано рецептов: 3',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: RetroColors.cocoa.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Повар-любитель',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Создано рецептов: 0',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 24),
 
-            // Статистика
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                childAspectRatio: 1.5,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  _buildStatCard(
-                    icon: Icons.restaurant_menu,
-                    title: 'Рецепты',
-                    value: '3',
-                    color: Colors.blue,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.favorite,
-                    title: 'Избранное',
-                    value: '0',
-                    color: Colors.red,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.access_time,
-                    title: 'Время готовки',
-                    value: '12ч',
-                    color: Colors.green,
-                  ),
-                  _buildStatCard(
-                    icon: Icons.star,
-                    title: 'Рейтинг',
-                    value: '4.5',
-                    color: Colors.amber,
-                  ),
-                ],
-              ),
-            ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            icon: Icons.restaurant_menu,
+                            title: 'Рецепты',
+                            value: '3',
+                            color: RetroColors.mustard,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStatCard(
+                            icon: Icons.favorite,
+                            title: 'Избранное',
+                            value: '0',
+                            color: RetroColors.cherryRed,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
-            // Настройки
-            Card(
-              margin: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.settings),
-                    title: const Text('Настройки'),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {},
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.volume_up),
-                    title: const Text('Голосовой помощник'),
-                    trailing: Switch(
-                      value: true,
-                      onChanged: (value) {},
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            icon: Icons.access_time,
+                            title: 'Время готовки',
+                            value: '12ч',
+                            color: RetroColors.avocado,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStatCard(
+                            icon: Icons.star,
+                            title: 'Рейтинг',
+                            value: '4.5',
+                            color: RetroColors.burntOrange,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.notifications),
-                    title: const Text('Уведомления'),
-                    trailing: Switch(
-                      value: true,
-                      onChanged: (value) {},
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -132,30 +149,42 @@ class ProfileScreen extends StatelessWidget {
     required String value,
     required Color color,
   }) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: RetroColors.cocoa.withOpacity(0.3), width: 2),
+        color: RetroColors.paper,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 40, color: color),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: RetroColors.cocoa,
             ),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.grey,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              color: RetroColors.cocoa,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

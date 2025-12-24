@@ -12,8 +12,17 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
-  speech_to_text: ^6.6.0
-  flutter_tts: ^4.2.0  # Обновленная версия
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.0.2
+  http: ^0.13.6
+  flutter_dotenv: ^5.0.2
+  flutter_svg: ^2.0.9
+  flutter_secure_storage: ^9.0.0
+
+  shared_preferences: ^2.2.2
+  intl_phone_field: ^3.2.0
+  # intl_phone_field: ^4.3.0
+   
 
 dev_dependencies:
   flutter_test:
@@ -22,3 +31,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+assets:
+    - assets/cherry.png
