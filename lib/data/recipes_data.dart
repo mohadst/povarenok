@@ -1,10 +1,49 @@
 import 'package:flutter/material.dart';
+class RecipeIngredient {
+  final String name;
+  final double? amount;
+  final String? unit;
+
+  RecipeIngredient({
+    required this.name,
+    this.amount,
+    this.unit,
+  });
+
+  factory RecipeIngredient.fromJson(Map<String, dynamic> json) {
+    return RecipeIngredient(
+      name: json['name'] ?? '',
+      amount: json['amount']?.toDouble(),
+      unit: json['unit'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'amount': amount,
+      'unit': unit,
+    };
+  }
+
+  @override
+  String toString() {
+    if (amount != null && unit != null) {
+      return '$name - $amount $unit';
+    } else if (amount != null) {
+      return '$name - $amount';
+    } else {
+      return name;
+    }
+  }
+}
+
 
 class Recipe {
   final String id;
   final String title;
   final String imageUrl;
-  final List<String> ingredients;
+  final List<RecipeIngredient> ingredients;
   final List<RecipeStep> steps;
   bool isFavorite;
 
@@ -17,12 +56,25 @@ class Recipe {
     this.isFavorite = false,
   });
 
-  factory Recipe.fromJson(Map<String, dynamic> json) {
+   factory Recipe.fromJson(Map<String, dynamic> json) {
+    List<RecipeIngredient> ingredients = [];
+    if (json['ingredients'] != null) {
+      if (json['ingredients'][0] is Map) {
+        ingredients = (json['ingredients'] as List)
+            .map((item) => RecipeIngredient.fromJson(item))
+            .toList();
+      } else {
+        ingredients = (json['ingredients'] as List<dynamic>)
+            .map((item) => RecipeIngredient(name: item.toString()))
+            .toList();
+      }
+    }
+
     return Recipe(
       id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
       title: json['title'] ?? '',
       imageUrl: json['image_url'] ?? json['imageUrl'] ?? '',
-      ingredients: List<String>.from(json['ingredients'] ?? []),
+      ingredients: ingredients,
       steps: (json['steps'] as List?)?.map((step) {
             if (step is Map<String, dynamic>) {
               return RecipeStep.fromJson(step);
@@ -43,12 +95,14 @@ class Recipe {
       'id': id,
       'title': title,
       'imageUrl': imageUrl,
-      'ingredients': ingredients,
+      'ingredients': ingredients.map((ing) => ing.toJson()).toList(),
       'steps': steps.map((step) => step.toJson()).toList(),
       'isFavorite': isFavorite,
     };
   }
 }
+
+
 
 class RecipeStep {
   final int number;
@@ -85,11 +139,20 @@ class RecipeStorage {
   void initializeWithDemoRecipes() {
     if (_recipes.isEmpty) {
       _recipes.addAll([
-        Recipe(
+          Recipe(
           id: '1',
           title: 'Классический борщ',
           imageUrl: 'https://images.unsplash.com/photo-1607523997461-0479e79d5f80?w=600',
-          ingredients: ['Свекла', 'Картофель', 'Капуста', 'Мясо', 'Лук', 'Морковь'],
+          ingredients: [
+            RecipeIngredient(name: 'Свекла', amount: 300, unit: 'г'),
+            RecipeIngredient(name: 'Картофель', amount: 400, unit: 'г'),
+            RecipeIngredient(name: 'Капуста', amount: 250, unit: 'г'),
+            RecipeIngredient(name: 'Говядина', amount: 500, unit: 'г'),
+            RecipeIngredient(name: 'Лук', amount: 2, unit: 'шт'),
+            RecipeIngredient(name: 'Морковь', amount: 1, unit: 'шт'),
+            RecipeIngredient(name: 'Томатная паста', amount: 2, unit: 'ст.л.'),
+            RecipeIngredient(name: 'Сметана', unit: 'по вкусу'),
+          ],
           steps: [
             RecipeStep(number: 1, instruction: 'Почистить и нарезать овощи'),
             RecipeStep(number: 2, instruction: 'Сварить бульон из мяса'),
@@ -101,7 +164,15 @@ class RecipeStorage {
           id: '2',
           title: 'Оливье',
           imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600',
-          ingredients: ['Картофель', 'Колбаса', 'Огурцы', 'Горошек', 'Яйца', 'Майонез'],
+          ingredients: [
+            RecipeIngredient(name: 'Картофель', amount: 4, unit: 'шт'),
+            RecipeIngredient(name: 'Докторская колбаса', amount: 300, unit: 'г'),
+            RecipeIngredient(name: 'Огурцы соленые', amount: 3, unit: 'шт'),
+            RecipeIngredient(name: 'Горошек консервированный', amount: 200, unit: 'г'),
+            RecipeIngredient(name: 'Яйца', amount: 4, unit: 'шт'),
+            RecipeIngredient(name: 'Майонез', amount: 100, unit: 'г'),
+            RecipeIngredient(name: 'Соль', unit: 'по вкусу'),
+          ],
           steps: [
             RecipeStep(number: 1, instruction: 'Отварить картофель и яйца'),
             RecipeStep(number: 2, instruction: 'Нарезать все ингредиенты кубиками'),
@@ -111,9 +182,16 @@ class RecipeStorage {
         ),
         Recipe(
           id: '3',
-          title: 'Шашлык',
+          title: 'Шашлык из свинины',
           imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600',
-          ingredients: ['Свинина', 'Лук', 'Уксус', 'Специи', 'Зелень'],
+          ingredients: [
+            RecipeIngredient(name: 'Свинина (шейка)', amount: 1, unit: 'кг'),
+            RecipeIngredient(name: 'Лук репчатый', amount: 3, unit: 'шт'),
+            RecipeIngredient(name: 'Уксус яблочный', amount: 50, unit: 'мл'),
+            RecipeIngredient(name: 'Специи для шашлыка', amount: 2, unit: 'ст.л.'),
+            RecipeIngredient(name: 'Соль', amount: 1, unit: 'ч.л.'),
+            RecipeIngredient(name: 'Зелень (петрушка, кинза)', amount: 1, unit: 'пучок'),
+          ],
           steps: [
             RecipeStep(number: 1, instruction: 'Нарезать мясо на кубики'),
             RecipeStep(number: 2, instruction: 'Мариновать с луком и специями 3 часа'),
@@ -121,18 +199,25 @@ class RecipeStorage {
             RecipeStep(number: 4, instruction: 'Жарить на углях 15 минут'),
           ],
         ),
-        Recipe(
+       Recipe(
           id: '4',
-          title: 'Блины',
+          title: 'Блины на молоке',
           imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w-600',
-          ingredients: ['Молоко', 'Яйца', 'Мука', 'Сахар', 'Соль', 'Масло'],
+          ingredients: [
+            RecipeIngredient(name: 'Молоко', amount: 500, unit: 'мл'),
+            RecipeIngredient(name: 'Яйца', amount: 3, unit: 'шт'),
+            RecipeIngredient(name: 'Мука', amount: 250, unit: 'г'),
+            RecipeIngredient(name: 'Сахар', amount: 2, unit: 'ст.л.'),
+            RecipeIngredient(name: 'Соль', amount: 0.5, unit: 'ч.л.'),
+            RecipeIngredient(name: 'Масло растительное', amount: 2, unit: 'ст.л.'),
+          ],
           steps: [
             RecipeStep(number: 1, instruction: 'Смешать яйца с сахаром и солью'),
-            RecipeStep(number: 2, instruction: 'Добавить молоко и муку'),
-            RecipeStep(number: 3, instruction: 'Выпекать на разогретой сковороде'),
+            RecipeStep(number: 2, instruction: 'Добавить молоко и муку, взбить'),
+            RecipeStep(number: 3, instruction: 'Выпекать на разогретой сковороде с маслом'),
             RecipeStep(number: 4, instruction: 'Подавать с вареньем или сметаной'),
           ],
-        ),
+       ),
       ]);
     }
   }

@@ -60,6 +60,24 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
     }
   }
 
+  String _formatIngredientAmount(RecipeIngredient ingredient) {
+  final parts = <String>[];
+  
+  if (ingredient.amount != null) {
+    // Убираем незначащие нули после запятой
+    final amountStr = ingredient.amount!.toStringAsFixed(
+        ingredient.amount!.truncateToDouble() == ingredient.amount! ? 0 : 1
+    );
+    parts.add(amountStr);
+  }
+  
+  if (ingredient.unit != null && ingredient.unit!.isNotEmpty) {
+    parts.add(ingredient.unit!);
+  }
+  
+  return parts.join(' ');
+}
+
   void _openTimer() {
     final timerManager = TimerManager();
 
@@ -308,73 +326,93 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            // В методе build, замените секцию ингредиентов на эту:
 
-            RetroCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Ингредиенты',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+const SizedBox(height: 16),
+
+RetroCard(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Ингредиенты',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 12),
+      if (widget.recipe.ingredients.isEmpty)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'Ингредиенты не указаны',
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Colors.grey,
+            ),
+          ),
+        )
+      else
+        ...widget.recipe.ingredients.asMap().entries.map((entry) {
+          final index = entry.key;
+          final ingredient = entry.value;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: RetroColors.avocado.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: RetroColors.avocado,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  if (widget.recipe.ingredients.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(
-                        'Ингредиенты не указаны',
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ingredient.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    )
-                  else
-                    ...widget.recipe.ingredients.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final ingredient = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: RetroColors.avocado.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${index + 1}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: RetroColors.avocado,
-                                  ),
-                                ),
-                              ),
+                      if (ingredient.amount != null || ingredient.unit != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            _formatIngredientAmount(ingredient),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: RetroColors.cocoa.withOpacity(0.7),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                ingredient,
-                                style: const TextStyle(fontSize: 16),
-                                softWrap: true,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      );
-                    }).toList(),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          );
+        }).toList(),
+    ],
+  ),
+),
 
             const SizedBox(height: 16),
 
@@ -623,7 +661,7 @@ class _StepBackgroundPainter extends CustomPainter {
       ..strokeWidth = 1;
     for (double y = 0; y < size.height; y += 20) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
-    }
+    } 
   }
 
   @override

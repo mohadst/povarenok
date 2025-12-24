@@ -1,8 +1,23 @@
 import 'package:flutter/material.dart';
 import '../data/recipes_data.dart';
 import '../theme/retro_colors.dart';
+import '../services/api_service.dart'; 
 import '../widgets/retro_card.dart';
 import 'dart:math';
+
+
+class IngredientFormData {
+  final TextEditingController nameController;
+  final TextEditingController amountController;
+  String selectedUnit;
+
+  IngredientFormData({
+    required this.nameController,
+    required this.amountController,
+    this.selectedUnit = 'шт',
+  });
+}
+
 
 class CreateRecipeScreen extends StatefulWidget {
   final VoidCallback? onRecipeCreated;
@@ -21,8 +36,12 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _imageUrlController = TextEditingController();
-  final List<TextEditingController> _ingredientControllers = [
-    TextEditingController()
+  final List<IngredientFormData> _ingredientFormData = [
+    IngredientFormData(
+      nameController: TextEditingController(),
+      amountController: TextEditingController(),
+      selectedUnit: 'шт',
+    )
   ];
   final List<TextEditingController> _stepControllers = [
     TextEditingController()
@@ -31,6 +50,19 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
   late final AnimationController _animationController;
   final RecipeStorage _recipeStorage = RecipeStorage();
   bool _isSubmitting = false;
+
+   final List<String> _unitOptions = [
+    'шт',
+    'г',
+    'кг',
+    'мл',
+    'л',
+    'ч.л.',
+    'ст.л.',
+    'стакан',
+    'щепотка',
+    'по вкусу'
+  ];
 
   @override
   void initState() {
@@ -46,107 +78,186 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
   void dispose() {
     _titleController.dispose();
     _imageUrlController.dispose();
-    for (final c in _ingredientControllers) c.dispose();
+    for (final data in _ingredientFormData) {
+      data.nameController.dispose();
+      data.amountController.dispose();
+    }
     for (final c in _stepControllers) c.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
-  void _addIngredient() =>
-      setState(() => _ingredientControllers.add(TextEditingController()));
+  void _addIngredient() => setState(() {
+    _ingredientFormData.add(
+      IngredientFormData(
+        nameController: TextEditingController(),
+        amountController: TextEditingController(),
+        selectedUnit: 'шт',
+      )
+    );
+  });
   
   void _addStep() =>
       setState(() => _stepControllers.add(TextEditingController()));
 
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
+  
+  setState(() {
+    _isSubmitting = true;
+  });
+
+  final ingredients = _ingredientFormData
+      .where((data) => data.nameController.text.isNotEmpty)
+      .map((data) {
+        final name = data.nameController.text;
+        final amountText = data.amountController.text;
+        final unit = data.selectedUnit;
+        
+        double? amount;
+        if (amountText.isNotEmpty) {
+          amount = double.tryParse(amountText.replaceAll(',', '.'));
+        }
+        
+        return {
+          'name': name,
+          'amount': amount,
+          'unit': unit,
+        };
+      })
+      .toList();
+
+  final steps = _stepControllers
+      .where((controller) => controller.text.isNotEmpty)
+      .toList()
+      .asMap()
+      .entries
+      .map((e) => {
+            'number': e.key + 1,
+            'instruction': e.value.text,
+          })
+      .toList();
+
+  final recipeData = {
+    'title': _titleController.text,
+    'imageUrl': _imageUrlController.text.isNotEmpty
+        ? _imageUrlController.text
+        : 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600',
+    'ingredients': ingredients,
+    'steps': steps,
+  };
+
+  print('🔄 Отправка рецепта на сервер...');
+  
+  try {
+    final result = await ApiService.saveRecipe(recipeData);
     
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final ingredients = _ingredientControllers
-        .where((controller) => controller.text.isNotEmpty)
-        .toList()
-        .asMap()
-        .entries
-        .map((e) => e.value.text)
-        .toList();
-
-    final steps = _stepControllers
-        .where((controller) => controller.text.isNotEmpty)
-        .toList()
-        .asMap()
-        .entries
-        .map((e) => RecipeStep(
-              number: e.key + 1,
-              instruction: e.value.text,
-            ))
-        .toList();
-
-    // Создаем новый рецепт
-    final newRecipe = Recipe(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+    if (result['success'] == true) {
+      final newRecipe = Recipe(
+      id: (result['recipe']?['id']?.toString()) ?? DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text,
       imageUrl: _imageUrlController.text.isNotEmpty
           ? _imageUrlController.text
           : 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600',
-      ingredients: ingredients,
-      steps: steps,
+      ingredients: ingredients.map((ing) => RecipeIngredient(
+        name: ing['name']?.toString() ?? '', 
+        amount: (ing['amount'] as num?)?.toDouble(), 
+        unit: ing['unit']?.toString(), 
+      )).toList(),
+      steps: steps.map((step) => RecipeStep(
+        number: (step['number'] as int?) ?? 1, 
+        instruction: step['instruction']?.toString() ?? '',
+      )).toList(),
       isFavorite: false,
     );
 
-    _recipeStorage.addRecipe(newRecipe);
+      _recipeStorage.addRecipe(newRecipe);
+      widget.onRecipeCreated?.call();
 
-    widget.onRecipeCreated?.call();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            '✅ Рецепт успешно создан и сохранен!',
+            style: TextStyle(fontSize: 16),
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
 
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
+          _clearForm();
+        }
+      });
+    } else {
+      setState(() {
+        _isSubmitting = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+           '❌ Ошибка сохранения: ${result['error']?.toString() ?? "Неизвестная ошибка"}',
+            style: const TextStyle(fontSize: 16),
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  } catch (e) {
+    setState(() {
+      _isSubmitting = false;
+    });
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text(
-          '✅ Рецепт успешно создан!',
-          style: TextStyle(fontSize: 16),
+        content: Text(
+          '❌ Ошибка сети: ${e.toString()}',
+          style: const TextStyle(fontSize: 16),
         ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3), 
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 5),
       ),
     );
-
-    // Очищаем форму через 1 секунду
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-        _clearForm();
-      }
-    });
   }
+}
 
-  void _clearForm() {
+   void _clearForm() {
     _titleController.clear();
     _imageUrlController.clear();
-    for (var controller in _ingredientControllers) {
-      controller.clear();
+    for (var data in _ingredientFormData) {
+      data.nameController.clear();
+      data.amountController.clear();
     }
     for (var controller in _stepControllers) {
       controller.clear();
     }
     setState(() {
-      _ingredientControllers.clear();
+      _ingredientFormData.clear();
       _stepControllers.clear();
-      _ingredientControllers.add(TextEditingController());
+      _ingredientFormData.add(
+        IngredientFormData(
+          nameController: TextEditingController(),
+          amountController: TextEditingController(),
+          selectedUnit: 'шт',
+        )
+      );
       _stepControllers.add(TextEditingController());
     });
   }
 
-  InputDecoration _input(String label, IconData icon) {
+   InputDecoration _input(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon, color: RetroColors.cocoa),
@@ -252,38 +363,117 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
                         _sectionHeader('Ингредиенты', 
                             _isSubmitting ? null : _addIngredient),
                         const SizedBox(height: 12),
-                        ..._ingredientControllers.asMap().entries.map(
+                        ..._ingredientFormData.asMap().entries.map(
                               (e) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: Row(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Column(
                                   children: [
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: e.value,
-                                        decoration: _input(
-                                            'Ингредиент ${e.key + 1}', Icons.check),
-                                        validator: (v) =>
-                                            v == null || v.isEmpty
-                                                ? 'Введите ингредиент'
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: RetroColors.avocado.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '${e.key + 1}',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: RetroColors.avocado,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          flex: 3,
+                                          child: TextFormField(
+                                            controller: e.value.nameController,
+                                            decoration: InputDecoration(
+                                              labelText: 'Название ингредиента',
+                                              filled: true,
+                                              fillColor: RetroColors.paper,
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            validator: (v) => v == null || v.isEmpty
+                                                ? 'Введите название'
                                                 : null,
-                                        textInputAction: e.key ==
-                                                _ingredientControllers.length - 1
-                                            ? TextInputAction.done
-                                            : TextInputAction.next,
-                                        enabled: !_isSubmitting,
-                                      ),
+                                            textInputAction: TextInputAction.next,
+                                            enabled: !_isSubmitting,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          flex: 2,
+                                          child: TextFormField(
+                                            controller: e.value.amountController,
+                                            decoration: InputDecoration(
+                                              labelText: 'Кол-во',
+                                              filled: true,
+                                              fillColor: RetroColors.paper,
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                            textInputAction: TextInputAction.next,
+                                            enabled: !_isSubmitting,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          flex: 2,
+                                          child: DropdownButtonFormField<String>(
+                                            value: e.value.selectedUnit,
+                                            decoration: InputDecoration(
+                                              labelText: 'Ед. изм.',
+                                              filled: true,
+                                              fillColor: RetroColors.paper,
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            items: _unitOptions
+                                                .map((unit) => DropdownMenuItem(
+                                                      value: unit,
+                                                      child: Text(unit),
+                                                    ))
+                                                .toList(),
+                                            onChanged: _isSubmitting
+                                                ? null
+                                                : (value) {
+                                                    if (value != null) {
+                                                      setState(() {
+                                                        e.value.selectedUnit = value;
+                                                      });
+                                                    }
+                                                  },
+                                            isExpanded: true,
+                                          ),
+                                        ),
+                                        if (_ingredientFormData.length > 1 && !_isSubmitting)
+                                          IconButton(
+                                            icon: const Icon(Icons.remove_circle,
+                                                color: Colors.red),
+                                            onPressed: () {
+                                              setState(() {
+                                                e.value.nameController.dispose();
+                                                e.value.amountController.dispose();
+                                                _ingredientFormData.removeAt(e.key);
+                                              });
+                                            },
+                                          ),
+                                      ],
                                     ),
-                                    if (_ingredientControllers.length > 1 && !_isSubmitting)
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle,
-                                            color: Colors.red),
-                                        onPressed: () {
-                                          setState(() {
-                                            _ingredientControllers
-                                                .removeAt(e.key);
-                                          });
-                                        },
-                                      ),
+                                    if (e.key < _ingredientFormData.length - 1)
+                                      const Divider(height: 20, thickness: 1),
                                   ],
                                 ),
                               ),

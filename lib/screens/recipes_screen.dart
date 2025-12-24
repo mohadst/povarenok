@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/recipes_data.dart';
 import '../theme/retro_colors.dart';
 import 'recipe_detail_screen.dart';
+import '../services/api_service.dart'; 
 import 'dart:math';
 
 class RecipesScreen extends StatefulWidget {
@@ -17,18 +18,95 @@ class RecipesScreenState extends State<RecipesScreen> {
   String _searchQuery = '';
   final ScrollController _scrollController = ScrollController();
 
+  Future<void> refreshRecipes() async {
+  await loadRecipes();
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
     loadRecipes();
+     });
   }
 
-  void loadRecipes() {
+  Future<void> loadRecipes() async {
+  try {
+    print('🔄 Загрузка рецептов...');
+    
+    // Загружаем демо-рецепты локально
     _recipeStorage.initializeWithDemoRecipes();
+    final localRecipes = _recipeStorage.getAllRecipes();
+    
+    // Пытаемся загрузить рецепты с сервера
+    print('🌐 Загрузка рецептов с сервера...');
+    final serverRecipes = await ApiService.getRecipes();
+    
+    // Конвертируем серверные рецепты в нашу модель
+    final convertedServerRecipes = serverRecipes.map((serverRecipe) {
+      // Конвертируем ингредиенты
+      final ingredients = (serverRecipe['ingredients'] as List? ?? [])
+          .map((ing) {
+            if (ing is Map) {
+              return RecipeIngredient(
+                name: ing['name']?.toString() ?? '',
+                amount: ing['amount']?.toDouble(),
+                unit: ing['unit']?.toString(),
+              );
+            } else if (ing is String) {
+              return RecipeIngredient(name: ing);
+            } else {
+              return RecipeIngredient(name: ing?.toString() ?? '');
+            }
+          })
+          .toList();
+      
+      final steps = (serverRecipe['steps'] as List? ?? [])
+          .map((step) {
+            if (step is Map) {
+              return RecipeStep(
+                number: step['number'] ?? 1,
+                instruction: step['instruction']?.toString() ?? step['text']?.toString() ?? '',
+              );
+            } else {
+              return RecipeStep(
+                number: 1,
+                instruction: step?.toString() ?? '',
+              );
+            }
+          })
+          .toList();
+      
+      return Recipe(
+        id: serverRecipe['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: serverRecipe['title']?.toString() ?? '',
+        imageUrl: serverRecipe['image_url']?.toString() ?? serverRecipe['imageUrl']?.toString() ?? '',
+        ingredients: ingredients,
+        steps: steps,
+        isFavorite: false,
+      );
+    }).toList();
+    
+    final allRecipes = [...localRecipes, ...convertedServerRecipes];
+    
+    final uniqueRecipes = <String, Recipe>{};
+    for (var recipe in allRecipes) {
+      uniqueRecipes[recipe.id] = recipe;
+    }
+    
+    setState(() {
+      _recipes = uniqueRecipes.values.toList();
+    });
+    
+    print('✅ Загружено рецептов: ${_recipes.length}');
+  } catch (e) {
+    print('❌ Ошибка загрузки рецептов: $e');
+    // Если сервер недоступен, используем только локальные
     setState(() {
       _recipes = _recipeStorage.getAllRecipes();
     });
   }
+}
 
   void _toggleFavorite(String recipeId) {
     _recipeStorage.toggleFavorite(recipeId);

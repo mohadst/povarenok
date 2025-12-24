@@ -30,7 +30,7 @@ class ApiService {
   }
 
 
-  // Вход по телефону
+
   static Future<Map<String, dynamic>> login(String phone, String password) async {
     final apiBaseUrl = await getBaseUrl();
     
@@ -125,24 +125,72 @@ class ApiService {
     }
   }
 
-  // Получить все рецепты
-  static Future<List<dynamic>> getRecipes() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/recipes'),
-        headers: {'Accept': 'application/json'},
-      ).timeout(const Duration(seconds: 5));
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data is List ? data : [];
-      }
-      return [];
-    } catch (e) {
-      print('❌ Error fetching recipes: $e');
-      return [];
+
+static Future<Map<String, dynamic>> saveRecipe(Map<String, dynamic> recipeData) async {
+  final apiBaseUrl = await getBaseUrl();
+  
+  try {
+    print('🔄 Сохранение рецепта на сервер...');
+    print('📦 Данные рецепта: ${recipeData['title']}');
+    
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/recipes'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(recipeData),
+    ).timeout(const Duration(seconds: 30));
+    
+    print('📊 Статус сохранения: ${response.statusCode}');
+    print('📦 Ответ сервера: ${response.body}');
+    
+    if (response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      return {
+        'success': true,
+        'recipe': data,
+      };
+    } else {
+      final error = jsonDecode(response.body);
+      return {
+        'success': false,
+        'error': error['error'] ?? 'Ошибка сохранения'
+      };
     }
+  } catch (e) {
+    print('❌ Ошибка сохранения рецепта: $e');
+    return {
+      'success': false,
+      'error': 'Ошибка сети: $e'
+    };
   }
+}
+
+static Future<List<dynamic>> getRecipes() async {
+  final apiBaseUrl = await getBaseUrl();
+  
+  try {
+    print('🔄 Загрузка рецептов с сервера...');
+    
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/recipes'),
+      headers: {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 10));
+    
+    print('📊 Статус загрузки: ${response.statusCode}');
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      print('📦 Загружено рецептов: ${(data is List ? data.length : 0)}');
+      return data is List ? data : [];
+    }
+    return [];
+  } catch (e) {
+    print('❌ Ошибка загрузки рецептов: $e');
+    return [];
+  }
+}
 
   static Future<bool> checkHealth() async {
     try {

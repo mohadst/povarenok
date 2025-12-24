@@ -5,17 +5,15 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ========== СНАЧАЛА ПАРСИНГ, ПОТОМ CORS ==========
-app.use(express.json()); // <-- ДОЛЖНО БЫТЬ ПЕРВЫМ!
+app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 
-// Затем CORS
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
       'http://localhost:8080',
       'http://127.0.0.1:8080',
-      'http://localhost:56273', // <-- Ваш Flutter порт
+      'http://localhost:56273',
       'http://127.0.0.1:56273',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
@@ -37,7 +35,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Логирование всех запросов
 app.use((req, res, next) => {
   console.log('\n' + '='.repeat(50));
   console.log(`📥 ${new Date().toISOString()} ${req.method} ${req.url}`);
@@ -47,10 +44,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// OPTIONS preflight запросы
 app.options('*', cors(corsOptions));
 
-// Health check с подробной информацией
 app.get('/api/health', (req, res) => {
   console.log('✅ Health check запрос');
   res.json({
@@ -65,7 +60,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ========== ВРЕМЕННЫЕ ДАННЫЕ ==========
 const users = [
   { 
     id: 1, 
@@ -95,9 +89,7 @@ const recipes = [
   }
 ];
 
-// ========== API МАРШРУТЫ ==========
 
-// Регистрация пользователя
 app.post('/api/auth/register', (req, res) => {
   console.log('📨 Регистрация пользователя');
   
@@ -112,7 +104,6 @@ app.post('/api/auth/register', (req, res) => {
       });
     }
     
-    // Проверяем существующего пользователя
     const existingUser = users.find(u => 
       u.phone === phone || u.username === username
     );
@@ -125,12 +116,11 @@ app.post('/api/auth/register', (req, res) => {
       });
     }
     
-    // Создаем нового пользователя
     const newUser = {
       id: users.length + 1,
       phone,
       username,
-      password_hash: password, // В реальном приложении хешируйте пароль!
+      password_hash: password, 
       created_at: new Date().toISOString()
     };
     
@@ -157,7 +147,6 @@ app.post('/api/auth/register', (req, res) => {
   }
 });
 
-// Вход пользователя (ОБНОВЛЕННЫЙ с подробным логированием)
 app.post('/api/auth/login', (req, res) => {
   console.log('\n' + '🔐 ЗАПРОС НА ВХОД ==========');
   console.log('Полный req объект:', {
@@ -170,7 +159,6 @@ app.post('/api/auth/login', (req, res) => {
   });
   
   try {
-    // Проверяем, есть ли тело запроса
     if (!req.body || Object.keys(req.body).length === 0) {
       console.log('❌ Тело запроса пустое или undefined');
       return res.status(400).json({
@@ -190,7 +178,6 @@ app.post('/api/auth/login', (req, res) => {
       });
     }
     
-    // Ищем пользователя
     const user = users.find(u => u.phone === phone);
     console.log('👤 Найден пользователь:', user);
     
@@ -202,7 +189,6 @@ app.post('/api/auth/login', (req, res) => {
       });
     }
     
-    // Проверка пароля
     if (user.password_hash !== password) {
       console.log('❌ Неверный пароль для:', phone);
       return res.status(401).json({
@@ -234,12 +220,10 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
-// Получить все рецепты
 app.get('/api/recipes', (req, res) => {
   console.log('📨 Запрос рецептов');
   
   try {
-    // Форматируем рецепты для ответа
     const formattedRecipes = recipes.map(recipe => ({
       ...recipe,
       ingredients: JSON.parse(recipe.ingredients),
@@ -253,7 +237,61 @@ app.get('/api/recipes', (req, res) => {
   }
 });
 
-// Обработка ошибок
+app.post('/api/recipes', (req, res) => {
+  console.log('📨 Сохранение нового рецепта');
+  console.log('📦 Данные рецепта:', req.body);
+  
+  try {
+    const { 
+      title, 
+      imageUrl, 
+      ingredients, 
+      steps
+    } = req.body;
+    
+    if (!title || !ingredients || !steps) {
+      console.log('❌ Отсутствуют обязательные поля');
+      return res.status(400).json({ 
+        success: false,
+        error: 'Обязательные поля: title, ingredients, steps' 
+      });
+    }
+    
+    const newRecipe = {
+      id: recipes.length + 1,
+      title,
+      image_url: imageUrl || 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=600',
+      ingredients: JSON.stringify(ingredients),
+      steps: JSON.stringify(steps),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    recipes.push(newRecipe);
+    console.log('✅ Рецепт сохранен:', newRecipe.id, newRecipe.title);
+    
+    const formattedRecipe = {
+      ...newRecipe,
+      ingredients: JSON.parse(newRecipe.ingredients),
+      steps: JSON.parse(newRecipe.steps)
+    };
+    
+    res.status(201).json({
+      success: true,
+      message: 'Рецепт успешно сохранен',
+      recipe: formattedRecipe
+    });
+    
+  } catch (error) {
+    console.error('💥 Ошибка сохранения рецепта:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Ошибка сервера при сохранении рецепта' 
+    });
+  }
+});
+
+
 app.use((err, req, res, next) => {
   console.error('🔥 Глобальная ошибка:', err);
   res.status(500).json({
@@ -263,7 +301,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Запуск сервера
 app.listen(port, () => {
   console.log('\n' + '='.repeat(50));
   console.log(`🚀 Сервер запущен на http://localhost:${port}`);
