@@ -6,7 +6,6 @@ class ApiService {
   static const String baseUrl = 'http://localhost:3000/api';
 
 
-    // Дополнительно добавьте проверку альтернативных адресов
   static Future<String> getBaseUrl() async {
     final urls = [
       'http://localhost:3000',
@@ -27,7 +26,6 @@ class ApiService {
       }
     }
     
-    // Fallback на localhost
     return 'http://localhost:3000/api';
   }
 
@@ -49,7 +47,7 @@ class ApiService {
           'phone': phone,
           'password': password,
         }),
-      ).timeout(const Duration(seconds: 30)); // Увеличиваем таймаут
+      ).timeout(const Duration(seconds: 30)); 
       
       print('📊 Статус входа: ${response.statusCode}');
       print('📦 Тело ответа: ${response.body}');
@@ -85,7 +83,6 @@ class ApiService {
     }
   }
 
-  // Регистрация по телефону
   static Future<Map<String, dynamic>> register(String phone, String username, String password) async {
     try {
       print('🔄 Регистрация: $phone, $username');
@@ -106,7 +103,7 @@ class ApiService {
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
         
-        // Сохраняем данные пользователя при успешной регистрации
+        
         if (data['success'] == true && data['user'] != null) {
           await StorageService.saveUserData(
             data['user']['phone'],
@@ -147,7 +144,6 @@ class ApiService {
     }
   }
 
-  // Проверка здоровья сервера
   static Future<bool> checkHealth() async {
     try {
       final response = await http.get(

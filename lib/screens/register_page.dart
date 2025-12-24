@@ -134,7 +134,6 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 20),
 
-              // Имя пользователя
               TextField(
                 controller: usernameController,
                 decoration: const InputDecoration(
@@ -145,7 +144,6 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 20),
 
-              // Пароль
               TextField(
                 controller: passwordController,
                 obscureText: true,
@@ -157,7 +155,6 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 20),
 
-              // Повтор пароля
               TextField(
                 controller: confirmPasswordController,
                 obscureText: true,

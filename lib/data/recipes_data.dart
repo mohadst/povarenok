@@ -74,7 +74,6 @@ class RecipeStep {
   }
 }
 
-// Сервис для хранения рецептов локально
 class RecipeStorage {
   static final RecipeStorage _instance = RecipeStorage._internal();
   factory RecipeStorage() => _instance;
@@ -83,7 +82,6 @@ class RecipeStorage {
   final List<Recipe> _recipes = [];
   final List<String> _favoriteRecipeIds = [];
 
-  // Инициализация с демо-данными
   void initializeWithDemoRecipes() {
     if (_recipes.isEmpty) {
       _recipes.addAll([
@@ -139,27 +137,22 @@ class RecipeStorage {
     }
   }
 
-  // Получить все рецепты
   List<Recipe> getAllRecipes() {
     return List.from(_recipes);
   }
 
-  // Получить избранные рецепты
   List<Recipe> getFavoriteRecipes() {
     return _recipes.where((recipe) => recipe.isFavorite).toList();
   }
 
-  // Добавить новый рецепт
   void addRecipe(Recipe recipe) {
-    _recipes.insert(0, recipe); // Добавляем в начало
+    _recipes.insert(0, recipe); 
   }
 
-  // Удалить рецепт
   void removeRecipe(String recipeId) {
     _recipes.removeWhere((recipe) => recipe.id == recipeId);
   }
 
-  // Добавить/убрать из избранного
   void toggleFavorite(String recipeId) {
     final index = _recipes.indexWhere((recipe) => recipe.id == recipeId);
     if (index != -1) {
@@ -167,7 +160,6 @@ class RecipeStorage {
     }
   }
 
-  // Поиск рецептов
   List<Recipe> searchRecipes(String query) {
     if (query.isEmpty) return getAllRecipes();
     return _recipes

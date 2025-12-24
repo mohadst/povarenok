@@ -31,7 +31,6 @@ class ProfileScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Шапка профиля
               RetroCard(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -49,13 +48,11 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                         child: Center(
-                          // Если у вас PNG файл, используйте:
                           child: Image.asset(
                             'assets/cherry.png',
                             height: 80,
                             width: 80,
                             errorBuilder: (context, error, stackTrace) {
-                              // Если изображение не загрузится, покажет иконку
                               return Icon(
                                 Icons.restaurant,
                                 size: 60,
@@ -63,17 +60,7 @@ class ProfileScreen extends StatelessWidget {
                               );
                             },
                           ),
-                          // Или если это действительно SVG, убедитесь что используете правильный путь
-                          // и что файл имеет расширение .svg
-                          // child: SvgPicture.asset(
-                          //   'assets/cherry.svg',
-                          //   height: 80,
-                          //   width: 80,
-                          //   placeholderBuilder: (BuildContext context) => Container(
-                          //     padding: const EdgeInsets.all(30.0),
-                          //     child: const CircularProgressIndicator(),
-                          //   ),
-                          // ),
+                          
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -99,11 +86,9 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // 4 фиксированные плашки
               Expanded(
                 child: Column(
                   children: [
-                    // Первый ряд
                     Row(
                       children: [
                         Expanded(
@@ -127,7 +112,6 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // Второй ряд
                     Row(
                       children: [
                         Expanded(

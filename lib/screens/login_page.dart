@@ -180,30 +180,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 10),
             
-            // Демо данные
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Column(
-                children: [
-                  Text(
-                    'Демо данные:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  Text(
-                    '+79998882233 / test123',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
+            
 
             // Телефон
             IntlPhoneField(
@@ -260,103 +237,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
             ),
             
-            // КНОПКА ПРОВЕРКИ ПОДКЛЮЧЕНИЯ
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey.withOpacity(0.1),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                children: [
-                  const Text(
-                    'Проверка подключения',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 4),
-                  ElevatedButton(
-                    onPressed: isLoading ? null : () async {
-                      print('🔄 Тестирую подключение к серверу...');
-                      
-                      final urls = [
-                        'http://localhost:3000/api/health',
-                        'http://10.0.2.2:3000/api/health',
-                        'http://127.0.0.1:3000/api/health',
-                      ];
-                      
-                      for (var url in urls) {
-                        try {
-                          print('🔄 Пробую: $url');
-                          final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
-                          print('✅ Успех: ${response.statusCode} - ${response.body}');
-                          
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('✅ Сервер доступен по $url'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                          return;
-                        } catch (e) {
-                          print('❌ $url: $e');
-                        }
-                      }
-                      
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('❌ Все адреса недоступны'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey,
-                      minimumSize: const Size(double.infinity, 40),
-                    ),
-                    child: const Text(
-                      '🔧 Проверить подключение',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // КНОПКА ТЕСТА ВХОДА
-            const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: isLoading ? null : _testLoginAndLoadRecipes,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 45),
-                side: const BorderSide(color: Colors.orange),
-              ),
-              child: isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                      ),
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.restaurant_menu, size: 18, color: Colors.orange),
-                        SizedBox(width: 8),
-                        Text(
-                          'Тест: Демо вход',
-                          style: TextStyle(color: Colors.orange),
-                        ),
-                      ],
-                    ),
-            ),
             
             const SizedBox(height: 10),
 

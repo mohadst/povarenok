@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../data/recipes_data.dart'; // Импортируйте новый файл
+import '../data/recipes_data.dart'; 
 import '../theme/retro_colors.dart';
 import 'recipe_detail_screen.dart';
 import 'dart:math';

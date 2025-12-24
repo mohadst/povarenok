@@ -8,6 +8,11 @@ import 'screens/login_page.dart';
 import 'screens/register_page.dart';
 import 'theme/retro_70s_theme.dart';
 
+
+import 'screens/chat_screen.dart';
+import 'screens/timer_screen.dart';
+import 'services/timer_manager.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -83,7 +88,6 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   
-  // Используем GlobalKey для обновления экрана рецептов
   final GlobalKey<RecipesScreenState> _recipesScreenKey = GlobalKey();
 
   static List<Widget> _screens = [];
@@ -91,7 +95,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    // Инициализируем экраны с ключами
     _screens = [
       RecipesScreen(key: _recipesScreenKey),
       const FavoritesScreen(),
@@ -102,7 +105,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _onItemTapped(int index) {
-    // Если переходим на экран рецептов, обновляем его
     if (index == 0 && _recipesScreenKey.currentState != null) {
       _recipesScreenKey.currentState?.loadRecipes();
     }

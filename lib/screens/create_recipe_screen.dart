@@ -65,7 +65,6 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
       _isSubmitting = true;
     });
 
-    // Небольшая задержка для анимации
     await Future.delayed(const Duration(milliseconds: 500));
 
     final ingredients = _ingredientControllers
@@ -99,13 +98,10 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
       isFavorite: false,
     );
 
-    // Сохраняем рецепт
     _recipeStorage.addRecipe(newRecipe);
 
-    // Уведомляем о создании рецепта
     widget.onRecipeCreated?.call();
 
-    // Простое уведомление без кнопки действия
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
@@ -113,7 +109,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen>
           style: TextStyle(fontSize: 16),
         ),
         backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3), // Автоматически исчезает через 3 секунды
+        duration: const Duration(seconds: 3), 
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

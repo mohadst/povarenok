@@ -23,7 +23,6 @@ class RecipesScreenState extends State<RecipesScreen> {
     loadRecipes();
   }
 
-  // Сделайте метод публичным, убрав нижнее подчеркивание
   void loadRecipes() {
     _recipeStorage.initializeWithDemoRecipes();
     setState(() {
@@ -48,7 +47,6 @@ class RecipesScreenState extends State<RecipesScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     
-    // Фильтрация рецептов по поисковому запросу
     final filteredRecipes = _searchQuery.isEmpty
         ? _recipes
         : _recipeStorage.searchRecipes(_searchQuery);
